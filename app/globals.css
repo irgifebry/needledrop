@@ -1,0 +1,243 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@theme {
+  --font-display: var(--font-anton), 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  --font-sans: var(--font-work-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-paper: #ffffff;
+  --color-paper-2: #efefea;
+  --color-ink: #0b0b0b;
+  --color-ink-2: #171717;
+  --color-ink-3: #242424;
+  --color-muted: #5c5c5c;
+  --color-mint: #a7ff9c;
+  --color-mint-soft: #dcffd4;
+  --color-orange: #ff6831;
+  --color-grey: #c8c8c8;
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+}
+
+@layer base {
+  :root {
+    --gutter: clamp(20px, 2.6vw, 36px);
+    --gap: clamp(12px, 1.4vw, 24px);
+    --header-ink: #0b0b0b;
+    --measure: 62ch;
+  }
+
+  /* Colour by chapter: the fixed header takes the ink of the field beneath it. */
+  [data-chapter='ink'] {
+    --header-ink: #ffffff;
+  }
+  [data-chapter='paper'] {
+    --header-ink: #0b0b0b;
+  }
+  [data-chapter='paper-2'] {
+    --header-ink: #0b0b0b;
+  }
+  [data-chapter='mint'] {
+    --header-ink: #0b0b0b;
+  }
+  [data-chapter='grey'] {
+    --header-ink: #0b0b0b;
+  }
+  [data-chapter='orange'] {
+    --header-ink: #0b0b0b;
+  }
+
+  * {
+    border-color: currentColor;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-mint);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 3px solid currentColor;
+    outline-offset: 3px;
+  }
+
+  img {
+    display: block;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+}
+
+@utility shell {
+  padding-inline: var(--gutter);
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1680px;
+}
+
+@utility grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--gap);
+}
+
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  line-height: 0.86;
+  letter-spacing: -0.015em;
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Type steps ─────────────────────────────────────────── */
+.t-display {
+  font-size: clamp(3.2rem, 11.2vw, 10rem);
+}
+.t-mega {
+  font-size: clamp(3rem, 8vw, 7.5rem);
+}
+.t-headline {
+  font-size: clamp(2.5rem, 6.4vw, 6rem);
+}
+.t-sub {
+  font-size: 2rem;
+  line-height: 1.1;
+}
+.t-mark {
+  font-size: clamp(1.6rem, 4.6vw, 4.2rem);
+}
+.t-title {
+  font-size: 1.5rem;
+  line-height: 1.25;
+}
+.t-lead {
+  font-size: 1.25rem;
+  line-height: 1.45;
+}
+.t-body {
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+.t-small {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+/* ── Marquee ────────────────────────────────────────────── */
+@keyframes nd-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: nd-marquee 38s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* ── Section entrance ───────────────────────────────────── */
+@keyframes nd-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The hidden state is only applied once the script has run, so the page is
+   never blank for a visitor whose JavaScript fails to load. */
+.js .rise {
+  opacity: 0;
+}
+
+.js .rise[data-shown='true'] {
+  animation: nd-rise 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── The moving picture ─────────────────────────────────── */
+@keyframes nd-drift {
+  from {
+    transform: scale(1.02) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.11) translate3d(-1.4%, -1.2%, 0);
+  }
+}
+
+.drift {
+  animation: nd-drift 22s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .rise,
+  .rise[data-shown='true'],
+  .js .rise {
+    opacity: 1;
+    animation: none;
+    transform: none;
+  }
+
+  .drift {
+    animation: none;
+  }
+
+  .marquee-track {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ── Small helpers ──────────────────────────────────────── */
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
