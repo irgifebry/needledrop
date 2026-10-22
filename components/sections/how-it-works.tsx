@@ -174,9 +174,18 @@ export function HowItWorks() {
                     strokeWidth={2}
                   />
                 </button>
-                {isOpen && (
-                  <p className="px-5 pb-5 t-body leading-relaxed">{stage.body}</p>
-                )}
+                <div
+                  aria-hidden={!isOpen}
+                  inert={!isOpen}
+                  className={cn(
+                    'grid overflow-hidden transition-[grid-template-rows,opacity] duration-400 ease-out motion-reduce:transition-none',
+                    isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+                  )}
+                >
+                  <p className="min-h-0 overflow-hidden px-5 pb-5 t-body leading-relaxed">
+                    {stage.body}
+                  </p>
+                </div>
               </div>
             )
           })}

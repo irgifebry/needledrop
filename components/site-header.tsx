@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import { Menu, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
@@ -16,6 +17,7 @@ export function SiteHeader() {
   const pathname = usePathname()
   const onHome = pathname === '/'
   const [chapter, setChapter] = useState('orange')
+  const [menuOpen, setMenuOpen] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
 
   // Colour by chapter: the header takes the ink of the field beneath it.
@@ -61,7 +63,7 @@ export function SiteHeader() {
     <header
       ref={headerRef}
       className={cn(
-        'fixed inset-x-0 top-0 z-40 flex items-center justify-between gap-6 border-b-2 px-[var(--gutter)] py-4',
+        'fixed inset-x-0 top-0 z-40 flex flex-wrap items-center justify-between gap-x-6 gap-y-4 border-b-2 px-[var(--gutter)] py-4',
         'border-[var(--header-ink)] bg-[var(--header-bg)] text-[var(--header-ink)] transition-colors duration-300',
       )}
     >
@@ -94,6 +96,58 @@ export function SiteHeader() {
         >
           Settings
         </Link>
+      </nav>
+
+      <button
+        type="button"
+        className="ml-auto inline-flex size-10 items-center justify-center text-[var(--header-ink)] md:hidden"
+        aria-expanded={menuOpen}
+        aria-controls="mobile-navigation"
+        aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        {menuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+      </button>
+
+      <nav
+        id="mobile-navigation"
+        aria-label="Mobile navigation"
+        aria-hidden={!menuOpen}
+        inert={!menuOpen}
+        className={cn(
+          'grid w-full basis-full grid-cols-1 overflow-hidden border-[var(--header-ink)]/30 md:hidden',
+          'transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none',
+          menuOpen
+            ? 'visible grid-rows-[1fr] border-t pt-4 opacity-100'
+            : 'invisible grid-rows-[0fr] border-t-0 pt-0 opacity-0',
+        )}
+      >
+        <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
+          {LINKS.map((link) => (
+            <a
+              key={link.href}
+              href={onHome ? link.href : `/${link.href}`}
+              className="t-small font-semibold text-[var(--header-ink)]"
+              onClick={() => setMenuOpen(false)}
+            >
+              {link.label}
+            </a>
+          ))}
+          <Link
+            href="/library"
+            className="t-small font-semibold text-[var(--header-ink)]"
+            onClick={() => setMenuOpen(false)}
+          >
+            Library
+          </Link>
+          <Link
+            href="/settings"
+            className="t-small font-semibold text-[var(--header-ink)]"
+            onClick={() => setMenuOpen(false)}
+          >
+            Settings
+          </Link>
+        </div>
       </nav>
 
     </header>

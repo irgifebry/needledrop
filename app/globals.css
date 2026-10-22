@@ -250,6 +250,10 @@
     animation: none;
   }
 
+  .stage-in {
+    animation: none;
+  }
+
   .marquee-track {
     animation: none;
   }
