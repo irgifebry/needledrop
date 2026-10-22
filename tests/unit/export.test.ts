@@ -224,4 +224,39 @@ describe('renderExport', () => {
   it('falls back to a plain name for a title with nothing usable', () => {
     expect(slugifyFilename('!!!')).toBe('playlist')
   })
+
+  /**
+   * The client-side export button renders the candidates it already holds,
+   * so the list that reaches a renderer is a `Candidate` — a `Track` plus
+   * the scoring fields. The extra fields have to be harmless: the client
+   * never has to strip them before rendering.
+   */
+  it('renders a candidate list without being told to strip the scoring fields', () => {
+    const candidate = {
+      ...first,
+      sources: ['related', 'topic'] as const,
+      score: 42,
+      reasons: [{ label: 'Same topic', points: 21 }],
+      versionTags: ['official'] as const,
+      official: true,
+    }
+
+    const rendered = renderExport('m3u', [candidate], { title: 'My mix' })
+
+    expect(rendered.filename).toBe('my-mix-1-tracks.m3u')
+    expect(rendered.body).toContain('#EXTINF:200,Artist One - Song Alpha')
+    expect(rendered.body).toContain('https://music.youtube.com/watch?v=vid00000001')
+  })
+
+  it('names a download after the playlist the user typed, not the seed', () => {
+    const rendered = renderExport('json', [first, second], { title: 'Late Night Drive' })
+
+    expect(rendered.filename).toBe('late-night-drive-2-tracks.json')
+  })
+
+  it('falls back to a plain file name when the user has not typed a title', () => {
+    const rendered = renderExport('text', [first], {})
+
+    expect(rendered.filename).toBe('playlist-1-tracks.txt')
+  })
 })
