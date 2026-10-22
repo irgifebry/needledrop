@@ -117,6 +117,13 @@ contains no I/O, so the hardest logic is unit-testable without touching the
 network. `lib/youtube/normalize.ts` derives a canonical `artist::title` key so
 the same song uploaded to six channels counts as one track.
 
+**Export needs no account.** The renderers in `lib/export/` are pure and
+client-safe, so the browser can render the tracklist itself — no request, no
+quota, and it keeps working when the API is down. The export row sits
+alongside the create button, which is what makes the app usable for a
+visitor who has not signed in: writing a playlist into a YouTube account
+needs one, taking the list with you does not.
+
 ### The backend
 
 Every route shares one envelope: a request id, a quota meter, rate limiting,

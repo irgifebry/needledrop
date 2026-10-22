@@ -1289,7 +1289,7 @@ Dependency shape: M7 → M8 → {M9, M10} → M11 → M12 → M13 → M14. M9 an
 | Same song uploaded by many channels floods the list | Playlist feels broken | Canonical `trackKey` dedupe across channels (§13.1.1) |
 | `relatedToVideoId` returns non-music or off-topic results | Poor recommendations | Category filter + topic scoring + explainable reasons + manual curation |
 | Tracks unavailable in the user's region | Playlist items won't play | `availableCountries` flag, region-safe mode, UI disclosure (§13.1.7, §9) |
-| OAuth verification rejected for `youtube.force-ssl` | Cannot create playlists in production | Start verification at M1, keep discovery-only mode functional, BYO key fallback, document the "export only" mode |
+| OAuth verification rejected for `youtube.force-ssl` | Cannot create playlists in production | Start verification at M1, keep discovery-only mode functional, BYO key fallback, document the "export only" mode — **shipped**: the export row renders the tracklist in the browser with no account, no request and no quota |
 | API quota policy changes | Discovery breaks | Thin `client.ts` boundary, feature flags, cached-only degradation, contract tests that fail loudly |
 | Explicit / NSFW content leaks into playlists | Reputation & policy risk | Family mode, keyword heuristics (disclosed as imperfect), blocklist, per-item removal in the editor |
 | Storing refresh tokens in a cookie | Account compromise on XSS | AES-256-GCM + `httpOnly` + `Secure` + `SameSite=Lax`, 4 KB payload limit, never logged, revoked on logout, CSP headers |
