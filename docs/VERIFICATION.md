@@ -352,7 +352,7 @@ The scope choice itself was never in question: the Data API publishes seven
 scopes and `youtube.force-ssl` is the narrowest one that authorises
 `playlists.insert`.
 
-### 4.3.1 Do not leave Google's boilerplate descriptions
+### 4.3.1 The description Google attaches is not editable yet
 
 The Data Access page pre-fills `youtube.force-ssl` with Google's generic
 text:
@@ -360,18 +360,34 @@ text:
 > *"See, edit, and permanently delete your YouTube videos, ratings, comments
 > and captions"*
 
-The app never touches a video. Leaving that description in place invites the
-exact question a reviewer should ask — *why does a playlist generator need
-to delete videos?* — and the honest answer is "it doesn't". The description
-is what the user reads on the consent screen, so it should describe what
-the scope is actually used for. Override both:
+The app never touches a video, so that description overstates what the
+scope is used for — and it is what a user reads on the consent screen.
 
-| Scope | Description to use |
-|---|---|
-| `youtube.force-ssl` | Create and edit playlists in your YouTube account |
-| `youtube.readonly` | See the playlists and videos in your YouTube library |
-| `userinfo.email` | Know your email address so the site can show which account is signed in |
-| `userinfo.profile` | Know your display name so the site can show which account is signed in |
+**It cannot be edited at this stage.** The table exposes a delete action
+only; there is no edit affordance for the description while the scope is
+awaiting approval, and re-adding the scope by hand does not produce an
+editable description either. The scope justification below is where the
+actual use is stated, and that is what the reviewer reads.
+
+After approval, the description can be corrected on the full Data Access
+page without re-running verification — the same edit that would change the
+consent screen text for future users.
+
+### 4.3.2 `youtube.readonly` is redundant, and that is fine
+
+`youtube.force-ssl` is a superset of `youtube.readonly`: the Data API's own
+discovery document lists `youtube.force-ssl` as an accepted scope for
+`playlists.list`, `playlistItems.list` and every write method, so the read
+scope adds no capability the app does not already have.
+
+It is still worth requesting both. The split tells the reviewer what the
+app actually does with each — writing playlists, and reading the library —
+and requesting a narrower scope alongside a broader one does not widen the
+grant. Dropping it would mean changing the code, the contract test, the
+consent screen declaration and any token issued so far, and it would delay
+the submission that starts the review clock. The redundancy is noise, not a
+policy problem; it is noted here rather than acted on.
+
 
 ### 4.4 Order of operations
 
