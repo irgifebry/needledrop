@@ -1,0 +1,180 @@
+import type { Metadata } from 'next'
+
+import { DataControls } from '@/components/privacy/data-controls'
+import { SiteFooter } from '@/components/sections/footer'
+import { SiteHeader } from '@/components/site-header'
+
+/**
+ * The privacy policy.
+ *
+ * Google requires a publicly reachable privacy policy for any app that reads
+ * Google user data, hosted on the same domain as the home page and linked
+ * from the OAuth consent screen. It also asks for a Limited Use disclosure
+ * naming the app and the policy the app adheres to.
+ *
+ * The page states only what the code actually does. When the storage layer
+ * changes — a database appears, a cookie is added — this page has to change
+ * with it, or it becomes a promise the app does not keep.
+ */
+
+export const metadata: Metadata = {
+  title: 'Privacy · needledrop',
+  description:
+    'What needledrop reads from Google, why it needs it, what it stores, how long it keeps it, and how to delete all of it.',
+  alternates: { canonical: '/privacy' },
+}
+
+const SECTIONS: Array<{ heading: string; body: string[]; list?: string[] }> = [
+  {
+    heading: 'The short version',
+    body: [
+      'needledrop reads YouTube metadata — titles, channels, topics, durations, view counts — to find tracks that belong with the one you dropped. It writes playlists to your own YouTube account. It never downloads audio, and it never sends your listening habits anywhere else.',
+      'Signing in is optional. Without an account you can still discover tracks and export a playlist; you just cannot write it to YouTube.',
+    ],
+  },
+  {
+    heading: 'What we access from Google',
+    body: [
+      'We ask for four permissions, and only when you press sign-in. You can withdraw any of them at any time from your Google account.',
+    ],
+    list: [
+      'youtube.force-ssl — create and edit playlists in your own account. This is the permission behind the "Create playlist" button.',
+      'youtube.readonly — read the playlists and library items the app shows you.',
+      'userinfo.email and userinfo.profile — your email address and display name, so the signed-in state can show whose account it is.',
+    ],
+  },
+  {
+    heading: 'Why we need them',
+    body: [
+      'Each permission is tied to one feature. The engine reads public metadata with a shared API key and never asks for your account. The moment you want a playlist written into your own YouTube account, we need write access to playlists and nothing else — no videos, no uploads, no comments, no viewing history.',
+      'We do not request your watch history, subscriptions, likes or any other signal about what you listen to. The engine is driven by the track you drop, not by a profile of you.',
+    ],
+  },
+  {
+    heading: 'What we store',
+    body: [
+      'Your OAuth access and refresh tokens, your email address and your display name are held in a single encrypted cookie named needledrop_session. It is encrypted with AES-256-GCM, marked httpOnly so scripts cannot read it, marked Secure so it only travels over HTTPS, and expires after 30 days. It is never written to a log.',
+      'Separately, an anonymous identifier named needledrop_anon ties together the things you do without an account: saved presets, blocked tracks, keep/drop feedback and run history. That identifier is a random value in a signed cookie — it is not derived from your email address, your IP address or anything about your device, and it is not linked to your Google account.',
+      'If a database is configured, those rows are persisted in it. If no database is configured, they live in the memory of the running process and disappear when the process restarts.',
+    ],
+  },
+  {
+    heading: 'What we never do',
+    list: [
+      'We never download, cache, remix or separate audio. Every recommendation is made from metadata.',
+      'We never sell, rent or share your data with advertisers or data brokers. There are no third-party trackers on this site.',
+      'We never use Google user data to train a machine-learning model, and we never hand it to anyone who would.',
+      'We never log an access token, a refresh token or a client secret.',
+    ],
+    body: [],
+  },
+  {
+    heading: 'How long we keep it',
+    body: [
+      'The session cookie lives for 30 days and is replaced by a fresh one whenever the token is refreshed. Signing out revokes the refresh token on Google’s side first, then clears the cookie locally — a leaked cookie cannot be replayed afterwards.',
+      'Presets, blocks, feedback and run history are kept until you delete them. There is no other retention schedule and no secondary use.',
+    ],
+  },
+  {
+    heading: 'Limited Use disclosure',
+    body: [
+      'needledrop’s use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.',
+      'Data obtained from Google APIs is used only to build and write the playlist you asked for on the account you signed in with. It is not used for advertising, not sold, not shared beyond the hosting and API providers described below, and not used to train any model.',
+    ],
+  },
+  {
+    heading: 'Who else is involved',
+    body: [
+      'Google provides the data and the identity. Vercel hosts the site and the API. Both are subject to their own privacy policies: Google’s API Services User Data Policy and Vercel’s privacy policy.',
+      'The shared YouTube API key used for public metadata is issued by Google to this project and is not tied to your account.',
+    ],
+    list: [
+      'YouTube Terms of Service — youtube.com/t/terms',
+      'YouTube API Services Terms of Service — developers.google.com/youtube/terms/api-services-terms-of-service',
+      'Google API Services User Data Policy — developers.google.com/terms/api-services-user-data-policy',
+    ],
+  },
+  {
+    heading: 'Children',
+    body: [
+      'needledrop is not directed at children under 13, and we do not knowingly collect personal information from them. The YouTube account you connect must be one you are allowed to use.',
+    ],
+  },
+  {
+    heading: 'Changes to this policy',
+    body: [
+      'If the handling of your data changes, this page changes first, and the date at the top changes with it.',
+    ],
+  },
+]
+
+export default function PrivacyPage() {
+  return (
+    <>
+      <SiteHeader />
+      <main className="bg-paper text-ink">
+        <section className="bg-ink text-paper">
+          <div className="shell py-[6svh]">
+            <p className="t-small uppercase tracking-widest text-paper/60">Legal</p>
+            <h1 className="display t-mega mt-4 leading-[0.9]">Privacy</h1>
+            <p className="t-lead mt-6 max-w-[60ch] text-paper/75">
+              What needledrop reads from Google, why it needs it, what it stores, and how to make it
+              disappear.
+            </p>
+            <p className="t-small mt-6 text-paper/50">Last updated 22 October 2026</p>
+          </div>
+        </section>
+
+        <div className="shell py-[6svh]">
+          <div className="max-w-[68ch]">
+            {SECTIONS.map((section) => (
+              <section key={section.heading} className="border-t-2 border-ink/15 py-8 first:border-t-0 first:pt-0">
+                <h2 className="t-title font-semibold">{section.heading}</h2>
+                {section.body.map((paragraph) => (
+                  <p key={paragraph} className="t-body mt-4 leading-relaxed text-ink/80">
+                    {paragraph}
+                  </p>
+                ))}
+                {section.list ? (
+                  <ul className="mt-4 space-y-3">
+                    {section.list.map((item) => (
+                      <li key={item} className="t-body flex gap-3 leading-relaxed text-ink/80">
+                        <span aria-hidden="true" className="mt-2 block h-2 w-2 shrink-0 bg-orange" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
+            ))}
+
+            <section className="border-t-2 border-ink/15 py-8">
+              <h2 className="t-title font-semibold">Delete everything</h2>
+              <p className="t-body mt-4 leading-relaxed text-ink/80">
+                Signing out revokes your Google token and clears the session cookie. The button below
+                additionally erases every row stored under your anonymous identifier — presets,
+                blocks, feedback and run history — and then rotates that identifier so the old
+                cookie cannot reach anything. It cannot be undone.
+              </p>
+              <div className="mt-6">
+                <DataControls />
+              </div>
+            </section>
+
+            <section className="border-t-2 border-ink/15 py-8">
+              <h2 className="t-title font-semibold">Contact</h2>
+              <p className="t-body mt-4 leading-relaxed text-ink/80">
+                Questions, deletions, or anything else:{' '}
+                <a href="mailto:hello@needledrop.app" className="underline underline-offset-4">
+                  hello@needledrop.app
+                </a>
+                . The source code is public, including this policy.
+              </p>
+            </section>
+          </div>
+        </div>
+      </main>
+      <SiteFooter />
+    </>
+  )
+}
