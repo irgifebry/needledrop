@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, test, vi } from 'vitest'
 
+import { resetCache } from '@/lib/cache'
 import { resetEnv } from '@/lib/env'
 import { createMeter } from '@/lib/youtube/client'
 import { isRegionSafe, regionLabel } from '@/lib/youtube/regions'
@@ -152,6 +153,11 @@ beforeEach(() => {
   requestedUrls = []
   process.env.YOUTUBE_API_KEY = 'test-key-for-the-contract-suite'
   resetEnv()
+  // The search is cached and the cache is a process-wide singleton, so a
+  // stale entry from the previous test would answer the next one without
+  // touching the network. Each test here asserts on the request that was
+  // made, so each one needs a cold cache.
+  resetCache()
 
   vi.stubGlobal(
     'fetch',
@@ -241,9 +247,12 @@ describe('the search-to-track pipeline', () => {
 
     const tracks = await searchSeeds('rick astley', meter)
 
-    expect(tracks).toHaveLength(2)
-    expect(tracks[0].videoId).toBe('dQw4w9WgXcQ')
-    expect(tracks[0].durationSec).toBe(213)
+    // The Rick Astley hit is an "Official Music Video" on a VEVO channel,
+    // so the music-only filter drops it; only the Gangnam Style recording
+    // survives.
+    expect(tracks).toHaveLength(1)
+    expect(tracks[0].videoId).toBe('9bZkp7q19f0')
+    expect(tracks[0].durationSec).toBe(253)
   })
 
   it('asks the search for the music category only', async () => {

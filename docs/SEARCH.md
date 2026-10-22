@@ -135,13 +135,32 @@ That makes the deployment's ceiling hard:
 | a discovery run, depth 2 | 400 | ~25 |
 
 **Every one of those runs is for the whole deployment, not per user.**
-Fifty discovery runs a day is a small product. Two things follow:
 
-- the `BYO key` the FAQ already promises is not optional, it is the
-  thing that makes the product usable at any scale — and it is not
-  implemented yet.
-- the shared key is the first thing to break under load, and its failure
-  is a 429 that reads like a bug rather than a limit.
+Three things follow, and all three are now implemented:
+
+- **the search is cached.** Every read — `/api/search`, `/api/resolve` and
+  the discovery pipeline — goes through the cache, so a seed two visitors
+  type in the same afternoon is paid for once, not twice. Before this,
+  `/api/search` and `/api/resolve` called the API directly and spent 100
+  units on every request, however often the same query was repeated.
+- **the `BYO key` the FAQ promises is implemented.** `POST /api/keys`
+  verifies a key with a one-unit `videos.list` probe — never a search — and
+  stores it encrypted in that browser's cookie. Every search it pays for
+  comes out of the visitor's own Google Cloud project, so their traffic
+  does not eat the shared budget. This is the thing that makes the product
+  usable at any scale.
+- **the failure reads like a limit, not a bug.** The API answers an
+  exhausted search bucket with a 429 whose reason is `rateLimitExceeded`,
+  not `quotaExceeded` — the same reason a per-minute throttle uses. Every
+  check in the codebase used to ask for `quotaExceeded`, so none of them
+  matched, and the failure surfaced as a 502 carrying a raw Google
+  sentence. The reason is now normalised at the boundary, and the visitor
+  gets a 429 that names the midnight-Pacific-Time reset.
+
+What is deliberately **not** done: spreading the app's own load over
+several Google Cloud projects to multiply the quota. That is a
+quota-circumvention pattern, and the shared key is meant to be a shared
+budget, not a private one.
 
 ## 6. The other half: what discovery does with the seed
 

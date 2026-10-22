@@ -65,3 +65,4 @@ assets/*
 
 # tool caches
 .vitest/
+__pycache__/

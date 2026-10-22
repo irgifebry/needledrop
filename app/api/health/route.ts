@@ -35,7 +35,7 @@ async function upstreamCheck(): Promise<Check> {
   }
 
   try {
-    const key = process.env.YOUTUBE_API_KEY ?? process.env.NEXT_PUBLIC_YOUTUBE_API_KEY ?? ''
+    const key = process.env.YOUTUBE_API_KEY ?? ''
     const url = `https://www.googleapis.com/youtube/v3/videos?part=id&id=${PROBE_VIDEO_ID}&key=${key}`
     const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(5000) })
     if (response.status === 403) {

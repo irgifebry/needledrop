@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
+     width="512" height="512" role="img"
+     aria-label="needledrop">
+  <rect width="512" height="512" fill="#a7ff9c" />
+  <circle cx="178" cy="342" r="216" fill="#0b0b0b" />
+  <circle cx="178" cy="342" r="130" fill="none" stroke="#a7ff9c" stroke-width="44" />
+  <circle cx="178" cy="342" r="30" fill="#ff6831" />
+  <line x1="452" y1="36" x2="318.2" y2="194.3" stroke="#0b0b0b" stroke-width="36" stroke-linecap="butt" />
+  <circle cx="452" cy="36" r="33" fill="#0b0b0b" />
+  <line x1="319.8" y1="196.1" x2="238" y2="268" stroke="#ff6831" stroke-width="24" stroke-linecap="butt" />
+  <circle cx="238" cy="268" r="22" fill="#ff6831" />
+</svg>

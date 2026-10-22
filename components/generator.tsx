@@ -1,7 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowRight,
   Check,
@@ -9,8 +10,9 @@ import {
   ExternalLink,
   Loader2,
   Lock,
-  Search,
   Sparkles,
+  ThumbsDown,
+  ThumbsUp,
 } from 'lucide-react'
 
 import { Button, ButtonLink } from '@/components/ui/button'
@@ -20,11 +22,21 @@ import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Popover } from '@/components/ui/popover'
 import { RadioGroup, RadioCard } from '@/components/ui/radio-group'
-import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
 import { ExportOptions } from '@/components/export-options'
+import { SeedPicker } from '@/components/seed/seed-picker'
+import { InlinePlayer } from '@/components/player/inline-player'
+import { JobProgress } from '@/components/jobs/job-progress'
+import { useJob } from '@/components/jobs/use-job'
 import { formatDuration } from '@/lib/format'
-import { DAILY_QUOTA, estimateDiscoveryUnits, estimatePlaylistUnits, formatUnits } from '@/lib/quota'
+import {
+  DAILY_QUOTA,
+  estimateDiscoveryUnits,
+  estimatePlaylistUnits,
+  formatUnits,
+} from '@/lib/quota'
 import { DEFAULT_OPTIONS, type Candidate, type DiscoveryOptions, type Track } from '@/lib/youtube/types'
+import type { BudgetStatus } from '@/lib/quota-ledger'
 import { cn } from '@/lib/utils'
 
 type Stage = 'seed' | 'tune' | 'build' | 'done'
@@ -34,6 +46,53 @@ type CreatedPlaylist = {
   playlistUrl: string | null
   demo: boolean
   message?: string
+  ordered?: boolean
+  note?: string
+}
+
+type PresetRow = {
+  id: string
+  anon_id: string
+  name: string
+  options: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+type BlockRow = {
+  id: string
+  anon_id: string
+  kind: 'artist' | 'keyword' | 'video_id'
+  value: string
+  created_at: string
+}
+
+type LibraryDuplicateIndex = {
+  trackKeys: number
+  scannedPlaylists: number
+  scannedItems: number
+  maxPlaylists: number
+  maxItems: number
+  truncated: boolean
+  keys: string[]
+}
+
+type PlanEstimateBreakdown = {
+  operation: string
+  label: string
+  count: number
+  units: number
+}
+
+type PlanResponse = {
+  estimate: { units: number; calls: number; breakdown: PlanEstimateBreakdown[] }
+  playlistEstimate: { units: number; tracks: number }
+  preview: Candidate[] | null
+  note: string
+  budget: BudgetStatus
+  demo: boolean
+  unitsSpent: number
+  calls: number
 }
 
 const STAGES: Array<{ id: Stage; label: string }> = [
@@ -42,37 +101,86 @@ const STAGES: Array<{ id: Stage; label: string }> = [
   { id: 'build', label: 'Build' },
 ]
 
+const FEEDBACK_REASONS = ['Wrong vibe', 'Too popular', 'Duplicate', 'Wrong version', 'Other']
+
 export function Generator() {
+  return (
+    <Suspense fallback={<div className="border-4 border-ink bg-ink text-paper p-5">Loading…</div>}>
+      <GeneratorInner />
+    </Suspense>
+  )
+}
+
+function GeneratorInner() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
   const [stage, setStage] = useState<Stage>('seed')
-  const [query, setQuery] = useState('')
-  const [seeds, setSeeds] = useState<Track[]>([])
   const [seed, setSeed] = useState<Track | null>(null)
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [options, setOptions] = useState<DiscoveryOptions>(DEFAULT_OPTIONS)
-  const [busy, setBusy] = useState<'search' | 'discover' | 'create' | null>(null)
+  const [busy, setBusy] = useState<'discover' | 'create' | 'plan' | 'resolve' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [created, setCreated] = useState<CreatedPlaylist | null>(null)
   const [unitsSpent, setUnitsSpent] = useState(0)
   const [demoMode, setDemoMode] = useState(false)
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [privacy, setPrivacy] = useState<'private' | 'unlisted' | 'public'>('private')
-  /**
-   * Whether a Google account is attached. `null` means "not known yet" — the
-   * session is fetched on mount, and until it lands neither the YouTube
-   * controls nor the sign-in prompt are shown, so nothing flashes.
-   *
-   * The app has no shared client state — the header keeps its own copy of
-   * the same session — so this is a second, independent read of one cheap
-   * endpoint rather than a new provider.
-   */
-  const [signedIn, setSignedIn] = useState<boolean | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
 
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+
+  const [plan, setPlan] = useState<PlanResponse | null>(null)
+  const [planBusy, setPlanBusy] = useState(false)
+
+  const [presets, setPresets] = useState<PresetRow[]>([])
+  const [presetName, setPresetName] = useState('')
+  const [presetsLoading, setPresetsLoading] = useState(true)
+  const [presetSaving, setPresetSaving] = useState(false)
+
+  const [blocks, setBlocks] = useState<BlockRow[]>([])
+
+  const [libraryKeys, setLibraryKeys] = useState<Set<string> | null>(null)
+  const [libraryInfo, setLibraryInfo] = useState<LibraryDuplicateIndex | null>(null)
+  const [libraryLoading, setLibraryLoading] = useState(false)
+
+  const [playingId, setPlayingId] = useState<string | null>(null)
+
+  const [jobPending, setJobPending] = useState(false)
+
+  const stageHeadingRef = useRef<HTMLHeadingElement>(null)
+
+  const job = useJob()
+
+  // Demo mode + presets + blocks on mount.
   useEffect(() => {
     fetch('/api/quota')
       .then((response) => response.json())
       .then((data: { demo: boolean }) => setDemoMode(Boolean(data.demo)))
+      .catch(() => undefined)
+
+    fetch('/api/presets')
+      .then((response) => response.json())
+      .then((data: { presets?: PresetRow[] }) => setPresets(data.presets ?? []))
+      .catch(() => undefined)
+      .finally(() => setPresetsLoading(false))
+
+    fetch('/api/blocks')
+      .then((response) => response.json())
+      .then((data: { blocks?: BlockRow[] }) => {
+        const next = data.blocks ?? []
+        setBlocks(next)
+        setOptions((current) => ({
+          ...current,
+          blockedArtists: next
+            .filter((block) => block.kind === 'artist')
+            .map((block) => block.value),
+          blockedKeywords: next
+            .filter((block) => block.kind === 'keyword')
+            .map((block) => block.value),
+        }))
+      })
       .catch(() => undefined)
   }, [])
 
@@ -91,48 +199,113 @@ export function Generator() {
     }
   }, [])
 
+  // Library index for "skip tracks I already have".
   useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null
-      const typing = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA'
-      if (event.key === '/' && !typing) {
-        event.preventDefault()
-        inputRef.current?.focus()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
-
-  const runSearch = useCallback(async () => {
-    if (!query.trim()) return
-    setBusy('search')
-    setError(null)
-    try {
-      const response = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+    if (signedIn !== true) return
+    let cancelled = false
+    fetch('/api/library')
+      .then((response) => {
+        setLibraryLoading(true)
+        return response.json()
       })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.message ?? 'The search failed.')
-      setSeeds(payload.seeds as Track[])
-      setUnitsSpent(payload.unitsSpent as number)
-      if ((payload.seeds as Track[]).length === 0) {
-        setError('No tracks matched that search. Try an artist name or a song title.')
-      }
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The search failed.')
-    } finally {
-      setBusy(null)
+      .then((data: { duplicateIndex?: LibraryDuplicateIndex }) => {
+        if (cancelled) return
+        if (data.duplicateIndex) {
+          setLibraryKeys(new Set(data.duplicateIndex.keys))
+          setLibraryInfo(data.duplicateIndex)
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setLibraryLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-  }, [query])
+  }, [signedIn])
 
-  function chooseSeed(track: Track) {
-    setSeed(track)
-    setTitle(`${track.artist} radio`)
-    setStage('tune')
-  }
+  // Seed from URL ?seed= param.
+  useEffect(() => {
+    const seedParam = searchParams.get('seed')
+    if (!seedParam) return
+    let cancelled = false
+    async function resolve() {
+      setBusy('resolve')
+      setError(null)
+      try {
+        const response = await fetch('/api/resolve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input: seedParam }),
+        })
+        const payload = (await response.json()) as {
+          label?: string
+          candidates?: Track[]
+          unitsSpent?: number
+          message?: string
+        }
+        if (!response.ok) {
+          throw new Error(payload.message ?? 'Could not resolve that seed.')
+        }
+        const found = (payload.candidates ?? []) as Track[]
+        if (found.length === 0) {
+          throw new Error('Nothing matched that seed.')
+        }
+        if (cancelled) return
+        const chosen = found[0]
+        setSeed(chosen)
+        setTitle(payload.label ? `${payload.label} radio` : `${chosen.artist} radio`)
+        setStage('tune')
+        setUnitsSpent((previous) => previous + (payload.unitsSpent ?? 0))
+        router.replace('/', { scroll: false })
+      } catch (caught) {
+        if (!cancelled) {
+          setError(caught instanceof Error ? caught.message : 'Could not resolve that seed.')
+        }
+      } finally {
+        if (!cancelled) setBusy(null)
+      }
+    }
+    void resolve()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, router])
+
+  // Move focus to the new step heading whenever the stage changes.
+  useEffect(() => {
+    stageHeadingRef.current?.focus()
+  }, [stage])
+
+  const handleJobCompletion = useCallback(() => {
+    if (!jobPending) return
+    if (job.status === 'succeeded' && job.result) {
+      setCreated({
+        playlistId: job.result.playlistId,
+        playlistUrl: job.result.playlistUrl,
+        demo: false,
+        ordered: job.result.ordered,
+        note: job.note,
+      })
+      setUnitsSpent((previous) => previous + (job.unitsSpent ?? 0))
+      setStage('done')
+      setJobPending(false)
+      setBusy(null)
+      job.reset()
+    } else if (job.status === 'failed' || job.status === 'cancelled') {
+      setError(job.error?.message ?? 'The playlist could not be created.')
+      setJobPending(false)
+      setBusy(null)
+      job.reset()
+    }
+  }, [jobPending, job])
+
+  // Watch an async job to completion.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    handleJobCompletion()
+  }, [handleJobCompletion])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const runDiscover = useCallback(async () => {
     if (!seed) return
@@ -144,17 +317,19 @@ export function Generator() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ seed, options }),
       })
-      const payload = await response.json()
+      const payload = (await response.json()) as {
+        candidates?: Candidate[]
+        unitsSpent?: number
+        message?: string
+      }
       if (!response.ok) throw new Error(payload.message ?? 'Discovery failed.')
-      const found = payload.candidates as Candidate[]
+      const found = (payload.candidates ?? []) as Candidate[]
       setCandidates(found)
       setPicked(new Set(found.map((candidate) => candidate.videoId)))
-      setUnitsSpent((payload.unitsSpent as number) ?? 0)
+      setUnitsSpent((previous) => previous + (payload.unitsSpent ?? 0))
       setStage('build')
       if (found.length === 0) {
-        setError(
-          'Nothing cleared the filters. Loosen the version toggles or widen the breadth slider.',
-        )
+        setError('Nothing cleared the filters. Loosen the version toggles or widen the breadth slider.')
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Discovery failed.')
@@ -163,33 +338,92 @@ export function Generator() {
     }
   }, [options, seed])
 
+  const runPlan = useCallback(async () => {
+    if (!seed) return
+    setPlanBusy(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seed, options, topN: 10 }),
+      })
+      const payload = (await response.json()) as PlanResponse & { message?: string }
+      if (!response.ok) throw new Error(payload.message ?? 'The plan could not be computed.')
+      setPlan(payload)
+      setUnitsSpent((previous) => previous + (payload.unitsSpent ?? 0))
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The plan could not be computed.')
+    } finally {
+      setPlanBusy(false)
+    }
+  }, [options, seed])
+
+  const createSync = useCallback(
+    async (videoIds: string[]) => {
+      const response = await fetch('/api/playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoIds, title, description, privacy }),
+      })
+      const payload = (await response.json()) as CreatedPlaylist & { unitsSpent?: number; message?: string }
+      if (!response.ok) throw new Error(payload.message ?? 'The playlist could not be created.')
+      setCreated(payload)
+      setStage('done')
+      setUnitsSpent((previous) => previous + (payload.unitsSpent ?? 0))
+    },
+    [description, privacy, title],
+  )
+
   const runCreate = useCallback(async () => {
-    const videoIds = candidates
-      .filter((candidate) => picked.has(candidate.videoId))
-      .map((candidate) => candidate.videoId)
+    const chosenCandidates = candidates.filter((candidate) => picked.has(candidate.videoId))
+    const videoIds = chosenCandidates.map((candidate) => candidate.videoId)
     if (videoIds.length === 0) {
       setError('Pick at least one track before creating the playlist.')
       return
     }
     setBusy('create')
     setError(null)
+    const idempotencyKey = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
     try {
-      const response = await fetch('/api/playlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoIds, title, description: '', privacy }),
-      })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.message ?? 'The playlist could not be created.')
-      setCreated(payload as CreatedPlaylist)
-      setStage('done')
-      setUnitsSpent((payload.unitsSpent as number) ?? 0)
+      if (videoIds.length >= 20) {
+        const result = await job.start({
+          videoIds,
+          title,
+          description,
+          privacy,
+          idempotencyKey,
+        })
+        if (result.disabled) {
+          await createSync(videoIds)
+          setBusy(null)
+          return
+        }
+        if (result.demo) {
+          const payload = result.payload as { message?: string; unitsSpent?: number }
+          setCreated({
+            playlistId: null,
+            playlistUrl: null,
+            demo: true,
+            message: payload.message,
+          })
+          setUnitsSpent((previous) => previous + (payload.unitsSpent ?? 0))
+          setStage('done')
+          setBusy(null)
+          return
+        }
+        setJobPending(true)
+        // busy stays true until the job settles (watched above)
+        return
+      }
+      await createSync(videoIds)
+      setBusy(null)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The playlist could not be created.')
-    } finally {
       setBusy(null)
     }
-  }, [candidates, picked, privacy, title])
+  }, [candidates, picked, title, description, privacy, job, createSync])
 
   const chosen = useMemo(
     () => candidates.filter((candidate) => picked.has(candidate.videoId)),
@@ -203,15 +437,10 @@ export function Generator() {
 
   const playlistUnits = estimatePlaylistUnits(chosen.length)
   const discoveryUnits = estimateDiscoveryUnits()
+  const railUnits = plan
+    ? plan.estimate.units + plan.playlistEstimate.units
+    : discoveryUnits + playlistUnits
 
-  /**
-   * Whether a playlist can be written at all.
-   *
-   * A Google account is what a real write needs. Demo mode is the other
-   * case: with no API key the route answers with a demo result rather than
-   * a 401, so the visitor still gets to see what a finished playlist looks
-   * like — which is worth keeping.
-   */
   const canCreate = signedIn === true || demoMode
 
   function toggle(videoId: string) {
@@ -223,20 +452,131 @@ export function Generator() {
     })
   }
 
+  /**
+   * Reset the whole run. The BYO-key state is deliberately kept: a visitor who
+   * pasted their own key should not have to paste it again just because they
+   * started a new playlist. Everything else — including the title, options and
+   * privacy they tuned — goes back to defaults.
+   */
   function reset() {
     setStage('seed')
     setSeed(null)
-    setSeeds([])
     setCandidates([])
     setPicked(new Set())
     setCreated(null)
     setError(null)
+    setTitle('')
+    setDescription('')
+    setOptions({
+      ...DEFAULT_OPTIONS,
+      blockedArtists: blocks
+        .filter((block) => block.kind === 'artist')
+        .map((block) => block.value),
+      blockedKeywords: blocks
+        .filter((block) => block.kind === 'keyword')
+        .map((block) => block.value),
+    })
+    setPrivacy('private')
     setUnitsSpent(0)
+    setPlan(null)
+    setPlayingId(null)
+    job.reset()
   }
+
+  const inLibrary = useCallback(
+    (candidate: Candidate) => {
+      if (!libraryKeys) return false
+      const key = candidate.trackKey ?? `${candidate.artist}::${candidate.title}`
+      return libraryKeys.has(key)
+    },
+    [libraryKeys],
+  )
+
+  const sendFeedback = useCallback(async (videoId: string, verdict: 'keep' | 'drop', reason?: string) => {
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId, verdict, reason }),
+      })
+    } catch {
+      // Feedback is best-effort; never block the UI on it.
+    }
+  }, [])
+
+  const blockArtist = useCallback(async (artist: string) => {
+    try {
+      const response = await fetch('/api/blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'artist', value: artist }),
+      })
+      const payload = (await response.json()) as { block?: BlockRow }
+      if (response.ok && payload.block) {
+        const block = payload.block as BlockRow
+        setBlocks((previous) => [...previous, block])
+        setOptions((current) => ({
+          ...current,
+          blockedArtists:
+            block.kind === 'artist'
+              ? [...current.blockedArtists, block.value]
+              : current.blockedArtists,
+          blockedKeywords:
+            block.kind === 'keyword'
+              ? [...current.blockedKeywords, block.value]
+              : current.blockedKeywords,
+        }))
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const applyPreset = useCallback((preset: PresetRow) => {
+    setOptions({ ...DEFAULT_OPTIONS, ...(preset.options as Partial<DiscoveryOptions>) })
+  }, [])
+
+  const savePreset = useCallback(async () => {
+    if (!presetName.trim()) return
+    setPresetSaving(true)
+    try {
+      const response = await fetch('/api/presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: presetName.trim(), options }),
+      })
+      const payload = (await response.json()) as { preset?: PresetRow; message?: string }
+      if (!response.ok || !payload.preset) {
+        setError(payload.message ?? 'The preset could not be saved.')
+        return
+      }
+      setPresets((previous) => {
+        const filtered = previous.filter((preset) => preset.name !== payload.preset!.name)
+        return [payload.preset as PresetRow, ...filtered]
+      })
+      setPresetName('')
+    } catch {
+      setError('The preset could not be saved.')
+    } finally {
+      setPresetSaving(false)
+    }
+  }, [options, presetName])
+
+  const liveStatus =
+    busy === 'create'
+      ? 'Creating playlist…'
+      : busy === 'discover'
+        ? 'Discovering tracks…'
+        : busy === 'plan'
+          ? 'Planning…'
+          : job.isRunning
+            ? 'Job running…'
+            : `${chosen.length} tracks selected`
 
   return (
     <div
-      data-ui className="flex h-full flex-col border-4 border-ink bg-ink text-paper shadow-[14px_14px_0_0_var(--color-orange)]"
+      data-ui
+      className="flex h-full flex-col border-4 border-ink bg-ink text-paper shadow-[14px_14px_0_0_var(--color-orange)]"
       aria-label="Playlist generator"
     >
       {/* Rail */}
@@ -267,102 +607,44 @@ export function Generator() {
               Demo catalogue
             </span>
           )}
-          <span className="tnum t-small text-paper/60">
-            ≈ {formatUnits(discoveryUnits + playlistUnits)} units
+          <span className="tnum t-small text-paper/60" aria-live="polite">
+            ≈ {formatUnits(railUnits)} units
           </span>
         </div>
       </div>
 
+      {/* aria-live region for quota / progress */}
+      <div aria-live="polite" className="sr-only">
+        {liveStatus} · approximately {formatUnits(railUnits)} units
+      </div>
+
       <div className="flex-1 overflow-y-auto">
         {stage === 'seed' && (
-          <div className="flex flex-col gap-4 p-5">
-            <div>
-              <h3 className="t-title font-semibold">Start with one track</h3>
-              <p className="mt-1 t-small text-paper/65">
-                A title, an artist, or a YouTube link. Everything else is inferred.
-              </p>
-            </div>
-
-            <form
-              className="flex flex-col gap-2 sm:flex-row"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void runSearch()
+          <div className="p-5">
+            <SeedPicker
+              onSeed={(track) => {
+                setSeed(track)
+                setTitle(`${track.artist} radio`)
+                setStage('tune')
               }}
-            >
-              <Input
-                ref={inputRef}
-                id="seed-input"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="e.g. Kaytranada - Lite Spots"
-                aria-label="Track, artist or YouTube link"
-                className="border-paper/40 placeholder:text-paper/65 focus-visible:border-mint"
-              />
-              <Button type="submit" size="md" disabled={busy === 'search'} className="shrink-0">
-                {busy === 'search' ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Search className="size-4" />
-                )}
-                Search
-              </Button>
-            </form>
-
-            {error && <p className="t-small text-orange">{error}</p>}
-
-            {busy === 'search' && (
-              <ul className="flex flex-col" aria-busy="true" aria-label="Searching">
-                {[0, 1, 2].map((row) => (
-                  <li key={row} className="flex items-center gap-3 border-t-2 border-paper/15 py-2.5">
-                    <Skeleton className="size-12 shrink-0" />
-                    <span className="flex-1">
-                      <Skeleton className="mb-2 h-3 w-2/3" />
-                      <Skeleton className="h-3 w-1/3" />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {seeds.length > 0 && (
-              <ul className="flex flex-col">
-                {seeds.slice(0, 6).map((track) => (
-                  <li key={track.videoId}>
-                    <button
-                      type="button"
-                      onClick={() => chooseSeed(track)}
-                      className="group flex w-full items-center gap-3 border-t-2 border-paper/15 py-2.5 text-left transition-colors hover:bg-paper/10"
-                    >
-                      <Image
-                        src={track.thumbnail}
-                        alt=""
-                        width={48}
-                        height={48}
-                        className="size-12 shrink-0 object-cover"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate t-body font-semibold">
-                          {track.title}
-                        </span>
-                        <span className="block truncate t-small text-paper/60">
-                          {track.artist} · {track.topicName}
-                        </span>
-                      </span>
-                      <span className="tnum shrink-0 t-small text-paper/70">
-                        {formatDuration(track.durationSec)}
-                      </span>
-                      <ArrowRight className="size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              onUnitsSpent={(units) => setUnitsSpent((previous) => previous + units)}
+            />
+            {error && <p className="mt-3 t-small text-orange">{error}</p>}
+            {busy === 'resolve' && (
+              <p className="mt-3 t-small text-paper/65">Resolving seed…</p>
             )}
           </div>
         )}
 
         {stage === 'tune' && seed && (
           <div className="flex flex-col gap-5 p-5">
+            <h2
+              ref={stageHeadingRef}
+              tabIndex={-1}
+              className="t-title font-semibold outline-none"
+            >
+              Tune the discovery
+            </h2>
             <div className="flex items-center gap-3">
               <Image
                 src={seed.thumbnail}
@@ -376,6 +658,47 @@ export function Generator() {
                 <p className="truncate t-small text-paper/60">
                   {seed.artist} · {seed.topicName}
                 </p>
+              </div>
+            </div>
+
+            {/* Presets */}
+            <div className="flex flex-col gap-2 border-2 border-paper/20 p-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="t-small font-semibold">Presets</span>
+                {presetsLoading && <Loader2 className="size-3.5 animate-spin" />}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {presets.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    className="border-2 border-paper/40 px-3 py-1 t-small font-semibold transition-colors hover:border-mint hover:text-mint"
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+                {presets.length === 0 && !presetsLoading && (
+                  <span className="t-small text-paper/60">No presets saved yet.</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  value={presetName}
+                  onChange={(event) => setPresetName(event.target.value)}
+                  placeholder="Preset name"
+                  aria-label="Preset name"
+                  className="border-paper/40 placeholder:text-paper/65 focus-visible:border-mint"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => void savePreset()}
+                  disabled={presetSaving || !presetName.trim()}
+                  className="shrink-0"
+                >
+                  {presetSaving ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Save preset
+                </Button>
               </div>
             </div>
 
@@ -442,7 +765,7 @@ export function Generator() {
                   >
                     <span>{label}</span>
                     <Switch
-                      checked={options[key]}
+                      checked={Boolean(options[key])}
                       onCheckedChange={(checked) =>
                         setOptions((current) => ({ ...current, [key]: checked }))
                       }
@@ -473,107 +796,300 @@ export function Generator() {
               </div>
             </Control>
 
+            {/* Library-aware dedupe */}
+            <Control label="Library">
+              {signedIn === true ? (
+                <label className="flex cursor-pointer items-center justify-between gap-4 t-small">
+                  <span>
+                    Skip tracks I already have
+                    {libraryInfo && (
+                      <span className="ml-2 text-paper/60">
+                        ({libraryInfo.trackKeys} keys · {libraryInfo.scannedPlaylists} playlists)
+                      </span>
+                    )}
+                  </span>
+                  <Switch
+                    checked={options.skipAlreadyInLibrary}
+                    onCheckedChange={(checked) =>
+                      setOptions((current) => ({ ...current, skipAlreadyInLibrary: checked }))
+                    }
+                    aria-label="Skip tracks I already have"
+                  />
+                </label>
+              ) : (
+                <p className="t-small text-paper/65">
+                  Sign in to compare candidates against your own library.
+                </p>
+              )}
+              {libraryLoading && <p className="t-small text-paper/60">Loading library…</p>}
+            </Control>
+
+            {blocks.length > 0 && (
+              <p className="t-small text-paper/65">
+                Blocklist applied: {blocks.length} {blocks.length === 1 ? 'rule' : 'rules'}.
+              </p>
+            )}
+
             {error && <p className="t-small text-orange">{error}</p>}
 
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button onClick={() => void runDiscover()} disabled={busy === 'discover'} block>
-                {busy === 'discover' ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Sparkles className="size-4" />
-                )}
+                {busy === 'discover' ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                 Discover tracks
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void runPlan()}
+                disabled={busy === 'discover' || planBusy || !seed}
+              >
+                {planBusy ? <Loader2 className="size-4 animate-spin" /> : null}
+                Preview cost
               </Button>
               <Button variant="outline" onClick={reset}>
                 Change seed
               </Button>
             </div>
+
+            {plan && (
+              <div className="flex flex-col gap-2 border-2 border-paper/20 p-3">
+                <p className="t-small font-semibold">Cost breakdown</p>
+                <ul className="flex flex-col gap-1">
+                  {plan.estimate.breakdown.map((row, index) => (
+                    <li
+                      key={`${row.operation}-${index}`}
+                      className="flex items-baseline justify-between gap-3 t-small"
+                    >
+                      <span className="text-paper/75">{row.label}</span>
+                      <span className="tnum shrink-0">
+                        {row.count} × {row.units / Math.max(row.count, 1)} = {row.units}
+                      </span>
+                    </li>
+                  ))}
+                  <li className="flex items-baseline justify-between gap-3 border-t-2 border-paper/15 pt-1 t-small font-semibold">
+                    <span>Discovery total</span>
+                    <span className="tnum">{plan.estimate.units} units</span>
+                  </li>
+                  <li className="flex items-baseline justify-between gap-3 t-small">
+                    <span>Playlist write ({plan.playlistEstimate.tracks} tracks)</span>
+                    <span className="tnum">{plan.playlistEstimate.units} units</span>
+                  </li>
+                  <li className="flex items-baseline justify-between gap-3 border-t-2 border-paper/15 pt-1 t-small font-semibold">
+                    <span>Grand total</span>
+                    <span className="tnum">
+                      {plan.estimate.units + plan.playlistEstimate.units} units
+                    </span>
+                  </li>
+                </ul>
+                <p className="t-small text-paper/65">{plan.note}</p>
+                {plan.preview && plan.preview.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-1">
+                    <p className="t-small font-semibold">Cached preview</p>
+                    <ul className="flex flex-col">
+                      {plan.preview.map((track) => (
+                        <li
+                          key={track.videoId}
+                          className="flex items-center gap-2 border-t-2 border-paper/15 py-1.5 t-small"
+                        >
+                          <span className="truncate">{track.title}</span>
+                          <span className="ml-auto shrink-0 text-paper/60">{track.artist}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {stage === 'build' && (
           <div className="flex flex-col gap-4 p-5">
             <div className="flex items-baseline justify-between gap-4">
-              <h3 className="t-title font-semibold">{chosen.length} tracks ready</h3>
+              <h2
+                ref={stageHeadingRef}
+                tabIndex={-1}
+                className="t-title font-semibold outline-none"
+              >
+                {chosen.length} tracks ready
+              </h2>
               <span className="tnum t-small text-paper/60">
                 {Math.round(totalSeconds / 60)} min
               </span>
             </div>
 
+            {candidates.length === 0 && (
+              <EmptyState
+                title="No candidates yet."
+                body="Run discovery from the tune stage. Candidates that clear your filters show up here."
+                className="border-paper/30 text-paper"
+              />
+            )}
+
+            {job.isRunning && <JobProgress progress={job.progress} note={job.note} unitsSpent={job.unitsSpent} />}
+
             <ul className="flex flex-col">
               {candidates.map((candidate) => {
                 const active = picked.has(candidate.videoId)
+                const alreadyInLibrary = inLibrary(candidate)
                 return (
                   <li
                     key={candidate.videoId}
                     className={cn(
-                      'flex items-center gap-3 border-t-2 border-paper/15 py-2.5 transition-opacity',
+                      'flex flex-col border-t-2 border-paper/15 py-2.5 transition-opacity',
                       !active && 'opacity-45',
                     )}
                   >
-                    <button
-                      type="button"
-                      onClick={() => toggle(candidate.videoId)}
-                      aria-pressed={active}
-                      aria-label={active ? `Remove ${candidate.title}` : `Add ${candidate.title}`}
-                      className={cn(
-                        'flex size-6 shrink-0 items-center justify-center border-2 transition-colors',
-                        active ? 'border-mint bg-mint text-ink' : 'border-paper/50',
-                      )}
-                    >
-                      {active && <Check className="size-4" strokeWidth={3} />}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => toggle(candidate.videoId)}
+                        aria-pressed={active}
+                        aria-label={active ? `Remove ${candidate.title}` : `Add ${candidate.title}`}
+                        className={cn(
+                          'flex size-6 shrink-0 items-center justify-center border-2 transition-colors',
+                          active ? 'border-mint bg-mint text-ink' : 'border-paper/50',
+                        )}
+                      >
+                        {active && <Check className="size-4" strokeWidth={3} />}
+                      </button>
 
-                    <Image
-                      src={candidate.thumbnail}
-                      alt=""
-                      width={44}
-                      height={44}
-                      className="size-11 shrink-0 object-cover"
-                    />
+                      <Image
+                        src={candidate.thumbnail}
+                        alt=""
+                        width={44}
+                        height={44}
+                        className="size-11 shrink-0 object-cover"
+                      />
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate t-small font-semibold leading-tight">
-                        {candidate.title}
-                      </p>
-                      <p className="truncate t-small text-paper/70">{candidate.artist}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate t-small font-semibold leading-tight">
+                          {candidate.title}
+                          {alreadyInLibrary && (
+                            <Badge className="ml-2 text-mint">In library</Badge>
+                          )}
+                        </p>
+                        <p className="truncate t-small text-paper/70">{candidate.artist}</p>
+                      </div>
+
+                      <span className="tnum hidden shrink-0 t-small text-paper/70 sm:block">
+                        {formatDuration(candidate.durationSec)}
+                      </span>
+
+                      <span className="tnum w-9 shrink-0 text-right t-small font-semibold text-mint">
+                        {Math.round(candidate.score)}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPlayingId((current) =>
+                            current === candidate.videoId ? null : candidate.videoId,
+                          )
+                        }
+                        className="shrink-0 text-paper/70 transition-colors hover:text-mint"
+                        aria-label={`Preview ${candidate.title}`}
+                      >
+                        <CircleHelp className="size-4" />
+                      </button>
+
+                      <Popover
+                        trigger={
+                          <button
+                            type="button"
+                            aria-label={`Why ${candidate.title} scored ${Math.round(candidate.score)}`}
+                            className="shrink-0 text-paper/70 transition-colors hover:text-paper"
+                          >
+                            <CircleHelp className="size-4" />
+                          </button>
+                        }
+                      >
+                        <p className="t-small font-semibold">Why this track</p>
+                        <ul className="mt-2 flex flex-col gap-1.5">
+                          {candidate.reasons.map((reason) => (
+                            <li
+                              key={reason.label}
+                              className="flex items-baseline justify-between gap-3 t-small"
+                            >
+                              <span className="text-ink/75">{reason.label}</span>
+                              <span className="tnum shrink-0 font-semibold">+{reason.points}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="mt-3 border-t-2 border-ink/15 pt-2 t-small text-ink/75">
+                          Matched on topic, channel and length. Not on audio analysis.
+                        </p>
+                      </Popover>
+
+                      {/* Feedback */}
+                      <Popover
+                        trigger={
+                          <button
+                            type="button"
+                            aria-label={`Feedback for ${candidate.title}`}
+                            className="shrink-0 text-paper/70 transition-colors hover:text-mint"
+                          >
+                            <ThumbsUp className="size-4" />
+                          </button>
+                        }
+                      >
+                        <p className="t-small font-semibold">Keep or drop?</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void sendFeedback(candidate.videoId, 'keep')}
+                            className="border-2 border-ink px-2 py-1 t-small font-semibold hover:bg-mint"
+                          >
+                            Keep
+                          </button>
+                          <Popover
+                            trigger={
+                              <button
+                                type="button"
+                                className="border-2 border-ink px-2 py-1 t-small font-semibold hover:bg-orange"
+                              >
+                                Drop
+                              </button>
+                            }
+                          >
+                            <p className="t-small font-semibold">Why drop?</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {FEEDBACK_REASONS.map((reason) => (
+                                <button
+                                  key={reason}
+                                  type="button"
+                                  onClick={() =>
+                                    void sendFeedback(candidate.videoId, 'drop', reason)
+                                  }
+                                  className="border-2 border-ink px-2 py-1 t-small hover:bg-orange/80"
+                                >
+                                  {reason}
+                                </button>
+                              ))}
+                            </div>
+                          </Popover>
+                        </div>
+                      </Popover>
+
+                      <button
+                        type="button"
+                        onClick={() => void blockArtist(candidate.artist)}
+                        className="shrink-0 text-paper/70 transition-colors hover:text-orange"
+                        aria-label={`Block ${candidate.artist}`}
+                        title="Block this artist"
+                      >
+                        <ThumbsDown className="size-4" />
+                      </button>
                     </div>
 
-                    <span className="tnum hidden shrink-0 t-small text-paper/70 sm:block">
-                      {formatDuration(candidate.durationSec)}
-                    </span>
-
-                    <span className="tnum w-9 shrink-0 text-right t-small font-semibold text-mint">
-                      {Math.round(candidate.score)}
-                    </span>
-
-                    <Popover
-                      trigger={
-                        <button
-                          type="button"
-                          aria-label={`Why ${candidate.title} scored ${Math.round(candidate.score)}`}
-                          className="shrink-0 text-paper/70 transition-colors hover:text-paper"
-                        >
-                          <CircleHelp className="size-4" />
-                        </button>
-                      }
-                    >
-                      <p className="t-small font-semibold">Why this track</p>
-                      <ul className="mt-2 flex flex-col gap-1.5">
-                        {candidate.reasons.map((reason) => (
-                          <li
-                            key={reason.label}
-                            className="flex items-baseline justify-between gap-3 t-small"
-                          >
-                            <span className="text-ink/75">{reason.label}</span>
-                            <span className="tnum shrink-0 font-semibold">+{reason.points}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <p className="mt-3 border-t-2 border-ink/15 pt-2 t-small text-ink/75">
-                        Matched on topic, channel and length. Not on audio analysis.
-                      </p>
-                    </Popover>
+                    {playingId === candidate.videoId && (
+                      <div className="mt-2">
+                        <InlinePlayer
+                          videoId={candidate.videoId}
+                          title={candidate.title}
+                          onClose={() => setPlayingId(null)}
+                        />
+                      </div>
+                    )}
                   </li>
                 )
               })}
@@ -586,6 +1102,17 @@ export function Generator() {
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   className="border-paper/40 focus-visible:border-mint"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className="t-small font-semibold">Description</span>
+                <textarea
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  rows={3}
+                  className="w-full border-2 border-paper/40 bg-transparent px-3 py-2 t-body text-paper placeholder:text-paper/65 focus-visible:border-mint"
+                  placeholder="Optional description for the playlist"
                 />
               </label>
 
@@ -635,25 +1162,25 @@ export function Generator() {
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 {canCreate && (
-                  <Button onClick={() => void runCreate()} disabled={busy === 'create'} block>
-                    {busy === 'create' ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <ArrowRight className="size-4" />
-                    )}
+                  <Button
+                    onClick={() => void runCreate()}
+                    disabled={busy === 'create' || job.isRunning}
+                    block
+                  >
+                    {busy === 'create' || job.isRunning ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
                     Create playlist
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => void runDiscover()} disabled={busy === 'discover'}>
+                <Button
+                  variant="outline"
+                  onClick={() => void runDiscover()}
+                  disabled={busy === 'discover'}
+                >
                   Re-run
                 </Button>
               </div>
 
-              <ExportOptions
-                tracks={chosen}
-                title={title}
-                heading={canCreate ? 'Or take the list with you' : 'Take the list with you'}
-              />
+              <ExportOptions tracks={chosen} title={title} />
             </div>
           </div>
         )}
@@ -664,39 +1191,49 @@ export function Generator() {
               <Badge className="border-mint text-mint">
                 {created.demo ? 'Demo run' : 'Playlist created'}
               </Badge>
-              <h3 className="mt-3 t-title font-semibold leading-tight">{title}</h3>
+              <h2
+                ref={stageHeadingRef}
+                tabIndex={-1}
+                className="mt-3 t-title font-semibold leading-tight outline-none"
+              >
+                {title}
+              </h2>
               <p className="mt-1 t-small text-paper/65">
                 {chosen.length} tracks · {Math.round(totalSeconds / 60)} min ·{' '}
                 {created.demo ? (
                   <>
-                    <span className="tnum">≈ {formatUnits(discoveryUnits + playlistUnits)}</span>{' '}
-                    units on a live run
+                    <span className="tnum">≈ {formatUnits(discoveryUnits + playlistUnits)}</span> units on a
+                    live run
                   </>
                 ) : (
                   <>
                     <span className="tnum">{formatUnits(unitsSpent)}</span> units spent
+                    {typeof created.ordered === 'boolean' && (
+                      <span className="ml-2">
+                        · {created.ordered ? 'order verified' : 'order not verified'}
+                      </span>
+                    )}
                   </>
                 )}
               </p>
+              {created.note && <p className="mt-1 t-small text-paper/60">{created.note}</p>}
             </div>
 
             {created.demo ? (
               <p className="border-2 border-paper/25 p-4 t-small text-paper/75">
-                {created.message ??
-                  'No playlist was created on YouTube. This is a demo run.'}
+                {created.message ?? 'No playlist was created on YouTube. This is a demo run.'}
               </p>
             ) : (
-              <Button variant="mint" block>
-                <a
-                  href={created.playlistUrl ?? '#'}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex w-full items-center justify-center gap-2"
-                >
-                  Open in YouTube Music
-                  <ExternalLink className="size-4" />
-                </a>
-              </Button>
+              <ButtonLink
+                href={created.playlistUrl ?? '#'}
+                variant="mint"
+                block
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open in YouTube Music
+                <ExternalLink className="size-4" />
+              </ButtonLink>
             )}
 
             <div className="flex flex-wrap gap-2">

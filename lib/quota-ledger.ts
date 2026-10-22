@@ -161,7 +161,9 @@ export function budgetStatus(sessionId: string): BudgetStatus {
  * Stops a request that would blow a budget.
  *
  * The message always says what the user can do next — the shared project key
- * is finite, so "wait" and "bring your own key" are the only two options.
+ * is finite, so "wait" and "add your own key" are the only two options, and
+ * both are now real: the quota resets at midnight Pacific Time, and a
+ * visitor can paste their own key next to the search box.
  */
 export function assertWithinBudget(sessionId: string): void {
   const status = budgetStatus(sessionId)
@@ -169,7 +171,7 @@ export function assertWithinBudget(sessionId: string): void {
   if (status.globalExceeded) {
     throw new AppError(
       'quota_exceeded',
-      `The shared daily API quota is used up (${status.dailySpend} of ${status.globalCap} units today). Try again tomorrow, or bring your own YouTube API key to keep going now.`,
+      `The shared daily API quota is used up (${status.dailySpend} of ${status.globalCap} units today). It resets at midnight Pacific Time, or add your own YouTube API key to keep going now.`,
       429,
       status,
     )
@@ -178,7 +180,7 @@ export function assertWithinBudget(sessionId: string): void {
   if (status.sessionExceeded) {
     throw new AppError(
       'quota_exceeded',
-      `This session used ${status.used} of ${status.sessionBudget} daily units. Try again tomorrow, or bring your own YouTube API key to keep going now.`,
+      `This session used ${status.used} of ${status.sessionBudget} daily units. It resets at midnight Pacific Time, or add your own YouTube API key to keep going now.`,
       429,
       status,
     )

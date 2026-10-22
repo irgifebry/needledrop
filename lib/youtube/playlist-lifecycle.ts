@@ -14,7 +14,13 @@
 
 import { AppError } from '@/lib/http/errors'
 
-import { parseIsoDuration, youtubeFetch, YouTubeError, type QuotaMeter } from './client'
+import {
+  isQuotaError,
+  parseIsoDuration,
+  youtubeFetch,
+  YouTubeError,
+  type QuotaMeter,
+} from './client'
 import {
   appendLineage,
   extractLineageMarker,
@@ -199,7 +205,7 @@ export function mapUpstreamError(error: unknown): AppError {
 
   const reason = error.code
 
-  if (reason === 'quotaExceeded' || reason === 'dailyLimitExceeded') {
+  if (isQuotaError(error)) {
     return new AppError('quota_exceeded', error.message, 429)
   }
   if (NOT_FOUND_REASONS.has(reason)) {
@@ -215,7 +221,7 @@ export function mapUpstreamError(error: unknown): AppError {
   if (error.status === 401) return new AppError('unauthorized', error.message, 401)
   if (error.status === 403) return new AppError('forbidden', error.message, 403)
   if (error.status === 404) return new AppError('not_found', error.message, 404)
-  if (error.status === 429) return new AppError('quota_exceeded', error.message, 429)
+  if (error.status === 429) return new AppError('rate_limited', error.message, 429)
 
   return new AppError('upstream_error', error.message, 502)
 }
@@ -239,11 +245,20 @@ function clampInt(value: number | undefined, min: number, max: number, fallback:
   return rounded
 }
 
-function pickThumbnail(thumbnails: RawThumbnails | undefined): string | undefined {
+export function isUsableThumbnail(url: string | undefined): url is string {
+  if (!url) return false
+  // YouTube answers "this playlist/video has no thumbnail" with a placeholder
+  // URL that itself 404s (`i.ytimg.com/img/no_thumbnail.jpg`). Treating it as
+  // a real thumbnail only produces a broken image, so drop it and let the
+  // caller fall back to its honest "no thumbnail" state.
+  return !/no_thumbnail/i.test(url)
+}
+
+export function pickThumbnail(thumbnails: RawThumbnails | undefined): string | undefined {
   if (!thumbnails) return undefined
   for (const size of ['medium', 'default', 'high', 'standard'] as const) {
     const url = thumbnails[size]?.url
-    if (url) return url
+    if (isUsableThumbnail(url)) return url
   }
   return undefined
 }

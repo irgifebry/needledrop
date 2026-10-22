@@ -15,11 +15,23 @@ const EnvSchema = z.object({
 
   /** Shared-project YouTube Data API key. Absent ⇒ demo catalogue. */
   YOUTUBE_API_KEY: z.string().min(1).optional(),
-  /** Per-user BYO key (encrypted in the session cookie). */
-  NEXT_PUBLIC_YOUTUBE_API_KEY: z.string().min(1).optional(),
+  /**
+   * A visitor's own key is *not* an environment variable.
+   *
+   * It is stored per browser in a sealed cookie and read per request — see
+   * `lib/session.ts`. There used to be a `NEXT_PUBLIC_YOUTUBE_API_KEY` here,
+   * which was two mistakes in one name: the `NEXT_PUBLIC_` prefix makes
+   * Next inline the value into the client bundle, so the key would have
+   * been published to every visitor, and a `NEXT_PUBLIC_` variable cannot be
+   * "per-user" anyway.
+   */
 
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+
+  /** Optional Spotify integration (search fallback + playlist import/export). */
+  SPOTIFY_CLIENT_ID: z.string().min(1).optional(),
+  SPOTIFY_CLIENT_SECRET: z.string().min(1).optional(),
   /** 32+ chars. Used to derive the AES-256-GCM session key. */
   SESSION_SECRET: z.string().min(32).optional(),
   NEXT_PUBLIC_APP_URL: z.string().default('http://localhost:3000'),
@@ -59,9 +71,10 @@ function rawEnv(): Record<string, string | undefined> {
   return {
     NODE_ENV: process.env.NODE_ENV,
     YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
-    NEXT_PUBLIC_YOUTUBE_API_KEY: process.env.NEXT_PUBLIC_YOUTUBE_API_KEY,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
+    SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
     SESSION_SECRET: process.env.SESSION_SECRET,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
@@ -100,12 +113,17 @@ export function isProduction(): boolean {
 }
 
 export function hasLiveApi(): boolean {
-  return Boolean(env().YOUTUBE_API_KEY || env().NEXT_PUBLIC_YOUTUBE_API_KEY)
+  return Boolean(env().YOUTUBE_API_KEY)
 }
 
 export function hasOAuth(): boolean {
   const value = env()
   return Boolean(value.GOOGLE_CLIENT_ID && value.GOOGLE_CLIENT_SECRET)
+}
+
+export function hasSpotify(): boolean {
+  const value = env()
+  return Boolean(value.SPOTIFY_CLIENT_ID && value.SPOTIFY_CLIENT_SECRET)
 }
 
 export function hasDatabase(): boolean {

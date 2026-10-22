@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 
 import { DataControls } from '@/components/privacy/data-controls'
+import { ScrollToTop } from '@/components/scroll-to-top'
 import { SiteFooter } from '@/components/sections/footer'
-import { SiteHeader } from '@/components/site-header'
+import { Toaster } from '@/components/toaster'
 
 /**
  * The privacy policy.
@@ -111,7 +112,7 @@ const SECTIONS: Array<{ heading: string; body: string[]; list?: string[] }> = [
 export default function PrivacyPage() {
   return (
     <>
-      <SiteHeader />
+      <ScrollToTop />
       <main className="bg-paper text-ink">
         <section className="bg-ink text-paper">
           <div className="shell py-[6svh]">
@@ -165,8 +166,8 @@ export default function PrivacyPage() {
               <h2 className="t-title font-semibold">Contact</h2>
               <p className="t-body mt-4 leading-relaxed text-ink/80">
                 Questions, deletions, or anything else:{' '}
-                <a href="mailto:hello@needledrop.app" className="underline underline-offset-4">
-                  hello@needledrop.app
+                <a href="mailto:irgifebry2006@gmail.com" className="underline underline-offset-4">
+                  irgifebry2006@gmail.com
                 </a>
                 . The source code is public, including this policy.
               </p>
@@ -175,6 +176,10 @@ export default function PrivacyPage() {
         </div>
       </main>
       <SiteFooter />
+      {/* The delete and sign-out controls report their result through sonner,
+          so the page has to mount the toaster itself. Without it the buttons
+          look broken: the request succeeds and nothing appears. */}
+      <Toaster />
     </>
   )
 }

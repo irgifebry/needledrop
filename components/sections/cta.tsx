@@ -32,7 +32,7 @@ export function Cta() {
             </p>
           </Reveal>
           <Reveal delay={140} className="col-span-12 lg:col-span-3 lg:col-start-10">
-            <ButtonLink href="#seed-input" size="lg" block>
+            <ButtonLink href="/#seed-input" size="lg" block>
               Drop a track
             </ButtonLink>
           </Reveal>

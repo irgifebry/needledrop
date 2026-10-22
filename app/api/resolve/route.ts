@@ -2,7 +2,8 @@ import { z } from 'zod'
 
 import { readJson, withRoute } from '@/lib/http/handler'
 import { fail, ok } from '@/lib/http/respond'
-import { hasLiveApi } from '@/lib/youtube/client'
+import { canReachLiveApi } from '@/lib/youtube/client'
+import { sessionIdFromRequest } from '@/lib/youtube/discover'
 import { resolveSeed } from '@/lib/youtube/resolve'
 import { seedProfileToJson } from '@/lib/youtube/types'
 
@@ -19,7 +20,7 @@ const Body = z.object({
 })
 
 export const POST = withRoute(
-  async ({ request, meter }) => {
+  async ({ request, meter, apiKey }) => {
     const parsed = Body.safeParse(await readJson(request))
     if (!parsed.success) {
       return fail(
@@ -30,11 +31,18 @@ export const POST = withRoute(
       )
     }
 
-    const resolution = await resolveSeed(parsed.data.input, meter)
+    // The session id attributes the spend in the quota ledger, so a resolver
+    // that burns three searches is visible to the budget that has to pay for
+    // them — it used to be invisible. A visitor's own key moves the spend
+    // onto their own quota.
+    const resolution = await resolveSeed(parsed.data.input, meter, {
+      sessionId: sessionIdFromRequest(request),
+      apiKeyOverride: apiKey ?? undefined,
+    })
     const meta = {
       unitsSpent: meter.units,
       calls: meter.calls,
-      demo: !hasLiveApi(),
+      demo: !canReachLiveApi(apiKey),
     }
 
     if (resolution.candidates.length === 0) {

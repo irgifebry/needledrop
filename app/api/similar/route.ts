@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { withRoute, readJson } from '@/lib/http/handler'
 import { fail, ok } from '@/lib/http/respond'
 import { normalizeDiscoveryOptions } from '@/lib/youtube/options'
-import { discover, seedSchema } from '@/lib/youtube/discover'
-import { hasLiveApi } from '@/lib/youtube/client'
+import { discover, seedSchema, sessionIdFromRequest } from '@/lib/youtube/discover'
+import { canReachLiveApi } from '@/lib/youtube/client'
 
 /**
  * `POST { seed, options }` → the scored candidate pool.
@@ -19,7 +19,7 @@ const Body = z.object({
 })
 
 export const POST = withRoute(
-  async ({ request, meter, region }) => {
+  async ({ request, meter, region, apiKey }) => {
     const parsed = Body.safeParse(await readJson(request))
     if (!parsed.success) {
       const issue = parsed.error.issues[0]
@@ -36,14 +36,23 @@ export const POST = withRoute(
     // complete set of options.
     const options = normalizeDiscoveryOptions(parsed.data.options)
 
-    const candidates = await discover(parsed.data.seed, options, meter, { region })
+    // The session id must come from the request. Without it every anonymous
+    // caller shared the literal 'anonymous' budget, so the per-session cap
+    // could never trip and the second hop always ran.
+    const candidates = await discover(parsed.data.seed, options, meter, {
+      region,
+      depth: options.depth,
+      sessionId: sessionIdFromRequest(request),
+      // A visitor's own key moves the whole run onto their own quota.
+      apiKeyOverride: apiKey ?? undefined,
+    })
 
     return ok(
       { candidates },
       {
         unitsSpent: meter.units,
         calls: meter.calls,
-        demo: !hasLiveApi(),
+        demo: !canReachLiveApi(apiKey),
       },
     )
   },

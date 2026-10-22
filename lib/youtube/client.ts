@@ -13,11 +13,22 @@ export function createMeter(): QuotaMeter {
 }
 
 export function apiKey(): string | undefined {
-  return process.env.YOUTUBE_API_KEY || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY
+  return process.env.YOUTUBE_API_KEY
 }
 
 export function hasLiveApi(): boolean {
   return Boolean(apiKey())
+}
+
+/**
+ * Whether *this request* can reach the live API.
+ *
+ * The shared project key is the usual answer, but a visitor who brought
+ * their own key can reach the API even when the deployment has no shared
+ * key configured at all — their key is a key like any other.
+ */
+export function canReachLiveApi(apiKeyOverride?: string | null): boolean {
+  return hasLiveApi() || Boolean(apiKeyOverride)
 }
 
 /**
@@ -68,10 +79,69 @@ export class YouTubeError extends Error {
     readonly status: number,
     /** `Retry-After` in milliseconds, when the upstream sent one. */
     readonly retryAfterMs?: number,
+    /**
+     * The raw `reason` the Data API sent, kept for diagnostics.
+     *
+     * `code` is normalised for quota failures (see {@link QUOTA_ERROR_CODE}),
+     * so this is the only place the original upstream wording survives.
+     */
+    readonly upstreamReason?: string,
   ) {
     super(message)
     this.name = 'YouTubeError'
   }
+}
+
+/**
+ * The code every exhausted-quota failure is normalised to.
+ *
+ * The Data API is not consistent about how it says "your quota is gone": the
+ * quota calculator documents `quotaExceeded` and `dailyLimitExceeded`, but the
+ * 429 a caller actually receives for an exhausted *search* bucket carries
+ * `rateLimitExceeded` — the same reason a per-minute throttle uses. Every
+ * check in this codebase asks for `quotaExceeded`, so a raw `rateLimitExceeded`
+ * slipped past all of them and an exhausted quota surfaced as a 502 carrying a
+ * raw Google sentence instead of a 429 the UI can explain.
+ *
+ * Normalising at the source — here, where the response is parsed — keeps the
+ * one place that knows the upstream's vocabulary in charge of it.
+ */
+export const QUOTA_ERROR_CODE = 'quotaExceeded'
+
+/** The reasons that mean a *daily* budget is spent. */
+const DAILY_QUOTA_REASONS = new Set(['quotaExceeded', 'dailyLimitExceeded'])
+
+/**
+ * Whether a Data API failure means "today's budget is gone".
+ *
+ * `rateLimitExceeded` is ambiguous upstream — it covers both the daily search
+ * bucket and a per-minute throttle — so it is told apart by the message: the
+ * daily bucket names its limit ("Search Queries per day"), a throttle does not.
+ */
+export function isDailyQuotaFailure(reason: string, message: string): boolean {
+  if (DAILY_QUOTA_REASONS.has(reason)) return true
+  if (reason === 'rateLimitExceeded') return /per day/i.test(message)
+  return false
+}
+
+/** The copy the user sees when the shared project's daily quota is spent. */
+export const QUOTA_MESSAGE =
+  'The YouTube API quota for today is used up. It resets at midnight Pacific Time, or you can add your own API key to keep going now.'
+
+/** The copy for a transient per-minute throttle, which is worth retrying. */
+export const RATE_LIMIT_MESSAGE =
+  'YouTube is throttling requests right now. Wait a moment and try again.'
+
+/**
+ * Whether an upstream failure means "the quota is gone" (fatal) or not.
+ *
+ * The single predicate every call site should use, so a quota failure is
+ * recognised the same way everywhere. It deliberately returns a plain
+ * boolean: a type predicate would narrow the *negative* branch to `never`
+ * at call sites that are already inside an `instanceof` check.
+ */
+export function isQuotaError(error: unknown): boolean {
+  return error instanceof YouTubeError && error.code === QUOTA_ERROR_CODE
 }
 
 export type FetchInit = RequestInit & {
@@ -165,16 +235,18 @@ export async function youtubeFetch<T>(
       error?: { message?: string; errors?: Array<{ reason?: string }> }
     }
     const reason = body.error?.errors?.[0]?.reason ?? 'unknown'
-    const message =
-      reason === 'quotaExceeded' || reason === 'dailyLimitExceeded'
-        ? 'The daily API quota is exhausted. Try again tomorrow, or bring your own key.'
-        : (body.error?.message ?? 'The YouTube API rejected the request.')
+    const upstreamMessage = body.error?.message ?? 'The YouTube API rejected the request.'
+    const dailyQuota = isDailyQuotaFailure(reason, upstreamMessage)
+    const throttled = !dailyQuota && (reason === 'rateLimitExceeded' || response.status === 429)
+
+    const message = dailyQuota ? QUOTA_MESSAGE : throttled ? RATE_LIMIT_MESSAGE : upstreamMessage
     const retryAfter = Number(response.headers.get('retry-after') ?? '')
     throw new YouTubeError(
       message,
-      reason,
+      dailyQuota ? QUOTA_ERROR_CODE : reason,
       response.status,
       Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : undefined,
+      reason,
     )
   }
 

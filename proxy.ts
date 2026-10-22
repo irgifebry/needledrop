@@ -21,6 +21,10 @@ const COARSE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   '/api/search': { limit: 15, windowMs: 60_000 },
   '/api/resolve': { limit: 15, windowMs: 60_000 },
   '/api/discover': { limit: 20, windowMs: 60_000 },
+  // The route the shipped UI actually calls for discovery. It spends the same
+  // 500 units as `/api/discover`, so it needs the same fence — without it,
+  // the coarsest limit on the most expensive path was 30/min.
+  '/api/similar': { limit: 20, windowMs: 60_000 },
   '/api/plan': { limit: 30, windowMs: 60_000 },
   '/api/export': { limit: 30, windowMs: 60_000 },
 }

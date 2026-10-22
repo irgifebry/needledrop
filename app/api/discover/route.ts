@@ -1,6 +1,6 @@
 import { readJson, withRoute } from '@/lib/http/handler'
 import { fail, ok } from '@/lib/http/respond'
-import { hasLiveApi } from '@/lib/youtube/client'
+import { canReachLiveApi } from '@/lib/youtube/client'
 import {
   discover,
   discoveryRequestSchema,
@@ -20,7 +20,7 @@ import { normalizeDiscoveryOptions } from '@/lib/youtube/options'
  * `cached` on top.
  */
 export const POST = withRoute(
-  async ({ request, meter, region }) => {
+  async ({ request, meter, region, apiKey }) => {
     const parsed = discoveryRequestSchema.safeParse(await readJson(request))
     if (!parsed.success) {
       return fail(
@@ -38,13 +38,15 @@ export const POST = withRoute(
       region,
       depth: options.depth,
       sessionId,
+      // A visitor's own key moves the whole run onto their own quota.
+      apiKeyOverride: apiKey ?? undefined,
       // The library keys are not loaded here: the library is behind the
       // lifecycle agent's authenticated routes, and an anonymous visitor has
       // no library to compare against. The pipeline supports it the moment a
       // caller has keys to hand.
     })
 
-    const demo = !hasLiveApi()
+    const demo = !canReachLiveApi(apiKey)
 
     return ok(
       { candidates },

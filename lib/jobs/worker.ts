@@ -1,5 +1,5 @@
 import { logger } from '@/lib/observability/logger'
-import { youtubeFetch, YouTubeError, type QuotaMeter } from '@/lib/youtube/client'
+import { isQuotaError, youtubeFetch, YouTubeError, type QuotaMeter } from '@/lib/youtube/client'
 import { createPlaylist, type PlaylistProgress } from '@/lib/youtube/playlists'
 
 import type {
@@ -241,7 +241,7 @@ async function recoverAndFinish(
     return { status: 'failed', error: fatal }
   }
 
-  if (failure instanceof YouTubeError && (failure.code === 'quotaExceeded' || failure.code === 'dailyLimitExceeded')) {
+  if (failure instanceof YouTubeError && isQuotaError(failure)) {
     return { status: 'failed', error: { code: 'quota_exceeded', message: failure.message } }
   }
 
@@ -534,9 +534,10 @@ function toJobError(error: unknown): JobError {
       }
     }
     if (error.status === 403) return { code: 'forbidden', message: error.message }
-    if (error.status === 429 || error.code === 'quotaExceeded' || error.code === 'dailyLimitExceeded') {
+    if (isQuotaError(error)) {
       return { code: 'quota_exceeded', message: error.message }
     }
+    if (error.status === 429) return { code: 'rate_limited', message: error.message }
     return { code: 'upstream_error', message: error.message }
   }
   if (error instanceof TypeError) {

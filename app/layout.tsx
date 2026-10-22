@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Anton, Work_Sans } from 'next/font/google'
 import './globals.css'
+import { SiteHeader } from '@/components/site-header'
+import { readSession } from '@/lib/session'
 
 const anton = Anton({
   weight: '400',
@@ -42,7 +44,9 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await readSession()
+  const initialUser = session ? { name: session.name, email: session.email } : null
   return (
     <html
       lang="en"
@@ -62,7 +66,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <SiteHeader initialUser={initialUser} />
+        {children}
+      </body>
     </html>
   )
 }

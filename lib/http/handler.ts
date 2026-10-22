@@ -5,7 +5,9 @@ import { env } from '@/lib/env'
 import { increment, observeDuration } from '@/lib/observability/metrics'
 import { logger, newRequestId } from '@/lib/observability/logger'
 import { withSpan } from '@/lib/observability/tracing'
-import { createMeter, YouTubeError, type QuotaMeter } from '@/lib/youtube/client'
+import { readUserApiKey } from '@/lib/session'
+import { createMeter, isQuotaError, YouTubeError, type QuotaMeter } from '@/lib/youtube/client'
+import { SpotifyError } from '@/lib/spotify/client'
 
 import { AppError, type ErrorCode } from './errors'
 import { checkRateLimit, clientKey } from './rate-limit'
@@ -19,6 +21,14 @@ export type ApiContext = {
   meter: QuotaMeter
   /** The visitor's two-letter country code, when the platform tells us. */
   region: string | null
+  /**
+   * The visitor's own YouTube API key, when they supplied one.
+   *
+   * `null` means "use the shared project key". A key here moves the
+   * request onto the visitor's own quota, which is the escape hatch the
+   * shared budget needs at any scale.
+   */
+  apiKey: string | null
 }
 
 export type RouteOptions = {
@@ -44,6 +54,9 @@ export function withRoute(
     const meter = createMeter()
     const url = new URL(request.url)
     const region = userRegion(request)
+    // The visitor's own key, if they set one. Read once per request and
+    // passed down, so no route has to reach into the cookie store itself.
+    const apiKey = await readUserApiKey()
 
     const limit = options.limit ?? env().RATE_LIMIT_PER_MINUTE
     const windowMs = options.windowMs ?? 60_000
@@ -59,7 +72,7 @@ export function withRoute(
 
     try {
       const response = await withSpan('http.request', { scope: options.scope, method: request.method }, async (span) => {
-        const result = await handler({ request, url, requestId, meter, region })
+        const result = await handler({ request, url, requestId, meter, region, apiKey })
         span.setAttribute('status', result.status)
         span.setAttribute('units', meter.units)
         return result
@@ -106,7 +119,14 @@ export function withRoute(
 
 type Mapped = { code: ErrorCode; message: string; status: number }
 
-function mapError(error: unknown): Mapped {
+/**
+ * Turns any failure into one of the app's stable error codes.
+ *
+ * Exported so the mapping can be tested directly: the quota case in
+ * particular is the one that used to be wrong, and it was wrong because
+ * nothing tested it.
+ */
+export function mapError(error: unknown): Mapped {
   if (error instanceof AppError) {
     return { code: error.code, message: error.message, status: error.status }
   }
@@ -124,12 +144,17 @@ function mapError(error: unknown): Mapped {
   }
 
   if (error instanceof YouTubeError) {
-    if (error.code === 'quotaExceeded' || error.code === 'dailyLimitExceeded') {
+    if (isQuotaError(error)) {
       return {
         code: 'quota_exceeded',
         message: error.message,
         status: 429,
       }
+    }
+    // A throttle is a limit too, but a different one: it clears on its own,
+    // so it must not be reported as a spent daily budget.
+    if (error.status === 429) {
+      return { code: 'rate_limited', message: error.message, status: 429 }
     }
     if (error.status === 403) {
       return { code: 'forbidden', message: error.message, status: 403 }
@@ -137,6 +162,10 @@ function mapError(error: unknown): Mapped {
     if (error.status === 404) {
       return { code: 'not_found', message: error.message, status: 404 }
     }
+    return { code: 'upstream_error', message: error.message, status: 502 }
+  }
+
+  if (error instanceof SpotifyError) {
     return { code: 'upstream_error', message: error.message, status: 502 }
   }
 

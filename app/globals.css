@@ -25,27 +25,37 @@
     --gutter: clamp(20px, 2.6vw, 36px);
     --gap: clamp(12px, 1.4vw, 24px);
     --header-ink: #0b0b0b;
+    --header-bg: #ffffff;
     --measure: 62ch;
   }
 
-  /* Colour by chapter: the fixed header takes the ink of the field beneath it. */
+  /* Colour by chapter: the fixed header takes the ink of the field beneath it,
+     and the field's own colour becomes the header's surface. The bar is
+     opaque, so whatever scrolls under it is cut cleanly instead of running
+     through the wordmark and the sign-in button. */
   [data-chapter='ink'] {
     --header-ink: #ffffff;
+    --header-bg: #0b0b0b;
   }
   [data-chapter='paper'] {
     --header-ink: #0b0b0b;
+    --header-bg: #ffffff;
   }
   [data-chapter='paper-2'] {
     --header-ink: #0b0b0b;
+    --header-bg: #efefea;
   }
   [data-chapter='mint'] {
     --header-ink: #0b0b0b;
+    --header-bg: #a7ff9c;
   }
   [data-chapter='grey'] {
     --header-ink: #0b0b0b;
+    --header-bg: #c8c8c8;
   }
   [data-chapter='orange'] {
     --header-ink: #0b0b0b;
+    --header-bg: #ff6831;
   }
 
   * {
@@ -54,6 +64,9 @@
 
   html {
     scroll-behavior: smooth;
+    /* The header is fixed, so an anchor jump must leave room for it —
+       otherwise the section heading lands underneath the bar. */
+    scroll-padding-top: 5rem;
     -webkit-text-size-adjust: 100%;
   }
 
@@ -188,6 +201,22 @@
 
 .js .rise[data-shown='true'] {
   animation: nd-rise 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── The stage accordion ────────────────────────────────── */
+@keyframes nd-stage-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.stage-in {
+  animation: nd-stage-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ── The moving picture ─────────────────────────────────── */

@@ -26,7 +26,12 @@ const QUESTIONS = [
   {
     question: 'Can I use my own API key?',
     answer:
-      'Yes, behind a labelled toggle. Your own key bypasses the shared project quota and is stored encrypted in your session, never logged.',
+      'Yes, behind a labelled toggle next to the search box. Your own key spends your own quota instead of the shared one, and it is stored encrypted in this browser — never logged, never sent anywhere but YouTube. Remove it whenever you like.',
+  },
+  {
+    question: 'What happens when the shared quota runs out?',
+    answer:
+      'Searches stop until midnight Pacific Time, when the quota resets. Nothing is lost and no playlist is half-made: the app says which limit was hit, and adding your own key keeps you working straight away.',
   },
   {
     question: 'Why might a track not play in YouTube Music?',

@@ -77,6 +77,7 @@ app/
     ├── blocks/route.ts         # blocked artists and keywords
     ├── feedback/route.ts       # per-track keep/drop signal
     ├── quota/route.ts          # GET  → quota snapshot
+    ├── keys/route.ts           # POST/DELETE → the visitor's own YouTube API key
     └── health/route.ts         # GET  → liveness + configuration
 
 components/
@@ -142,11 +143,28 @@ browser → app/api/*/route.ts
 
 **Quota is the scarce resource.** `search.list` costs 100 units,
 `playlistItems.insert` costs 50 per item, and a 20-track playlist is ≈ 1,450
-units against a daily project quota of 10,000. Three things keep that
-sustainable: a cache (`search:{q}` 30 min, `videos:{ids}` 6 h), query-level
-pre-filtering so fewer candidates are hydrated at all, and cheap sources
-first — the trending chart costs 1 unit and artist radio costs 2, while
-`search.list` is the last resort.
+units against a daily project quota of 10,000. The project's allowance is
+**100 searches a day, for the whole deployment** — the Data API gives
+`search.list` a bucket of its own, and it is the first thing to run out.
+
+Four things keep that sustainable:
+
+- a cache (`search:{q}` 30 min, `videos:{ids}` 6 h) that every read goes
+  through, so a seed two visitors type in the same afternoon is paid for
+  once;
+- **the visitor's own API key.** `POST /api/keys` verifies a key with a
+  one-unit probe and stores it encrypted in that browser's cookie; every
+  search it pays for comes out of the visitor's own Google Cloud project
+  instead of the shared one. This is the escape hatch that makes the product
+  usable at any scale — spreading the app's own load over several projects
+  would be quota circumvention, so it is deliberately not done;
+- query-level pre-filtering so fewer candidates are hydrated at all;
+- cheap sources first — the trending chart costs 1 unit and artist radio
+  costs 2, while `search.list` is the last resort.
+
+When the day's budget really is gone, the app says so: a 429 with
+`quota_exceeded`, naming the midnight-Pacific-Time reset, rather than a
+generic upstream fault.
 
 **Everything external is optional.** No Redis → an in-process cache with the
 same TTLs. No Postgres → an in-memory store. No Inngest → an in-process job

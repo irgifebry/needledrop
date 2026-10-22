@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { resetCache } from '@/lib/cache'
 import { createMeter } from '@/lib/youtube/client'
 import { searchSeeds } from '@/lib/youtube/search'
 
@@ -90,6 +91,10 @@ beforeEach(() => {
   // The search path checks for a key before it touches the network, and
   // falls back to the offline catalogue when there is none.
   process.env.YOUTUBE_API_KEY = 'test-key-for-the-search-contract-suite'
+  // The search is cached and the cache is a process-wide singleton, so a
+  // stale entry would answer the next test without touching the network.
+  // Every test here asserts on the request that was made.
+  resetCache()
 })
 
 afterEach(() => {

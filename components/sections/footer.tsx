@@ -7,17 +7,17 @@ const LINK_COLUMNS = [
   {
     title: 'Product',
     links: [
-      { label: 'How it works', href: '#how' },
-      { label: 'Why it works', href: '#why' },
-      { label: 'Questions', href: '#faq' },
+      { label: 'How it works', href: '/#how' },
+      { label: 'Why it works', href: '/#why' },
+      { label: 'Questions', href: '/#faq' },
     ],
   },
   {
     title: 'Engine',
     links: [
-      { label: 'Similarity scoring', href: '#why' },
-      { label: 'Quota model', href: '#faq' },
-      { label: 'Metadata only', href: '#faq' },
+      { label: 'Similarity scoring', href: '/#why' },
+      { label: 'Quota model', href: '/#faq' },
+      { label: 'Metadata only', href: '/#faq' },
     ],
   },
   {
@@ -98,10 +98,10 @@ export function SiteFooter() {
               Metadata only. No audio is ever downloaded.
             </p>
             <a
-              href="mailto:hello@needledrop.app"
+              href="mailto:irgifebry2006@gmail.com"
               className="t-small text-paper/65 transition-colors hover:text-mint"
             >
-              hello@needledrop.app
+              irgifebry2006@gmail.com
             </a>
           </div>
         </div>
@@ -110,7 +110,7 @@ export function SiteFooter() {
           <p className="t-small text-paper/70">
             © {new Date().getFullYear()} needledrop · MIT licence
           </p>
-          <ButtonLink href="#seed-input" size="sm" variant="mint">
+          <ButtonLink href="/#seed-input" size="sm" variant="mint">
             Drop a track
           </ButtonLink>
         </div>

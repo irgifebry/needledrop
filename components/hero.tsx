@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import Link from 'next/link'
 
 import { Generator } from '@/components/generator'
 import { ButtonLink } from '@/components/ui/button'
@@ -38,15 +39,15 @@ export function Hero() {
               endpoints that do exist, and we show you the price before you pay it.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-4">
-              <ButtonLink href="#seed-input" size="lg">
+              <ButtonLink href="/#seed-input" size="lg">
                 Drop a track
               </ButtonLink>
-              <a
-                href="#how"
+              <Link
+                href="/#how"
                 className="t-small font-semibold underline decoration-mint decoration-2 underline-offset-4 hover:text-mint"
               >
                 See how the engine works
-              </a>
+              </Link>
             </div>
           </div>
 

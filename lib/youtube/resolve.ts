@@ -1,6 +1,7 @@
 import { buildSeedProfile } from '@/lib/seed/centroid'
+import { cachedFetch } from '@/lib/cache'
 
-import { hasLiveApi, youtubeFetch, type QuotaMeter } from './client'
+import { canReachLiveApi, type QuotaMeter } from './client'
 import { DEMO_TRACKS } from './demo'
 import { channelArtistName, parseChannelName } from './artist'
 import {
@@ -11,6 +12,7 @@ import {
   searchSeeds,
   videosByIds,
   type ResolvedChannel,
+  type SearchInit,
 } from './search'
 import type { SeedKind, SeedProfile, Track } from './types'
 
@@ -351,17 +353,21 @@ type PlaylistItemsResponse = {
  * only shows up in how much quota was spent and how many reference tracks the
  * centroid carries.
  */
-export async function resolveSeed(input: string, meter: QuotaMeter): Promise<SeedResolution> {
+export async function resolveSeed(
+  input: string,
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<SeedResolution> {
   const classified = classifySeedInput(input)
 
   if (classified.kind === 'video' && classified.videoId) {
-    return resolveVideoSeed(classified.videoId, meter)
+    return resolveVideoSeed(classified.videoId, meter, init)
   }
   if (classified.kind === 'playlist' && classified.playlistId) {
-    return resolvePlaylistSeed(classified.playlistId, meter)
+    return resolvePlaylistSeed(classified.playlistId, meter, init)
   }
   if (classified.kind === 'artist' && classified.channelId) {
-    return resolveArtistByChannelId(classified.channelId, meter)
+    return resolveArtistByChannelId(classified.channelId, meter, init)
   }
 
   const query = (classified.query ?? '').trim()
@@ -370,16 +376,20 @@ export async function resolveSeed(input: string, meter: QuotaMeter): Promise<See
   }
 
   if (looksLikeArtistName(query)) {
-    const artist = await resolveArtistByName(query, meter)
+    const artist = await resolveArtistByName(query, meter, init)
     if (artist) return artist
   }
 
-  return resolveTextSeed(query, meter)
+  return resolveTextSeed(query, meter, init)
 }
 
 /** A pasted video is the cheapest possible seed: one `videos.list` call. */
-async function resolveVideoSeed(videoId: string, meter: QuotaMeter): Promise<SeedResolution> {
-  const tracks = hasLiveApi()
+async function resolveVideoSeed(
+  videoId: string,
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<SeedResolution> {
+  const tracks = canReachLiveApi(init.apiKeyOverride)
     ? await videosByIds([videoId], meter)
     : DEMO_TRACKS.filter((track) => track.videoId === videoId)
   const track = tracks[0]
@@ -404,19 +414,24 @@ async function resolveVideoSeed(videoId: string, meter: QuotaMeter): Promise<See
  * and an extra call is not worth it — so the label is derived from the items
  * themselves.
  */
-async function resolvePlaylistSeed(playlistId: string, meter: QuotaMeter): Promise<SeedResolution> {
+async function resolvePlaylistSeed(
+  playlistId: string,
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<SeedResolution> {
   let tracks: Track[]
 
-  if (hasLiveApi()) {
-    const items = await youtubeFetch<PlaylistItemsResponse>(
+  if (canReachLiveApi(init.apiKeyOverride)) {
+    const items = await cachedFetch<PlaylistItemsResponse>(
       'playlistItems.list',
       { part: 'snippet,contentDetails', playlistId, maxResults: 50 },
       meter,
+      init,
     )
     const ids = (items.items ?? [])
       .map((item) => item.contentDetails?.videoId)
       .filter((id): id is string => Boolean(id))
-    tracks = await videosByIds(ids, meter)
+    tracks = await videosByIds(ids, meter, init)
   } else {
     tracks = demoPlaylistTracks(playlistId)
   }
@@ -438,17 +453,25 @@ async function resolvePlaylistSeed(playlistId: string, meter: QuotaMeter): Promi
  * (preferring the auto-generated `- Topic` one), the second lists that
  * channel's music.
  */
-async function resolveArtistByName(query: string, meter: QuotaMeter): Promise<SeedResolution | null> {
-  const channel = await resolveChannel(query, meter)
+async function resolveArtistByName(
+  query: string,
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<SeedResolution | null> {
+  const channel = await resolveChannel(query, meter, init)
   if (!channel) return null
   if (!channelMatchesQuery(channel.title, query)) return null
-  return resolveArtistFromChannel(channel, meter)
+  return resolveArtistFromChannel(channel, meter, init)
 }
 
 /** A pasted channel URL already names the channel, so only the title is missing. */
-async function resolveArtistByChannelId(channelId: string, meter: QuotaMeter): Promise<SeedResolution> {
-  const channel = await channelById(channelId, meter)
-  const tracks = await searchByChannelId(channelId, meter)
+async function resolveArtistByChannelId(
+  channelId: string,
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<SeedResolution> {
+  const channel = await channelById(channelId, meter, init)
+  const tracks = await searchByChannelId(channelId, meter, init)
   if (tracks.length === 0) {
     return {
       kind: 'artist',
@@ -472,8 +495,9 @@ async function resolveArtistByChannelId(channelId: string, meter: QuotaMeter): P
 async function resolveArtistFromChannel(
   channel: ResolvedChannel,
   meter: QuotaMeter,
+  init: SearchInit = {},
 ): Promise<SeedResolution | null> {
-  const tracks = await searchByChannelId(channel.id, meter)
+  const tracks = await searchByChannelId(channel.id, meter, init)
   if (tracks.length === 0) return null
 
   const label = cleanChannelTitle(channel.title)
@@ -492,8 +516,14 @@ async function resolveArtistFromChannel(
  * The search hits become the candidates and the best-ranked one becomes the
  * single-track centroid the engine works from.
  */
-async function resolveTextSeed(query: string, meter: QuotaMeter): Promise<SeedResolution> {
-  const hits = hasLiveApi() ? await searchSeeds(query, meter) : demoSearch(query)
+async function resolveTextSeed(
+  query: string,
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<SeedResolution> {
+  const hits = canReachLiveApi(init.apiKeyOverride)
+    ? await searchSeeds(query, meter, init)
+    : demoSearch(query)
   const ranked = rankSeedCandidates(hits, query)
   const top = ranked[0]
 

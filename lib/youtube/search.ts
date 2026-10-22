@@ -1,6 +1,8 @@
+import { cachedFetch } from '@/lib/cache'
+
 import { DEMO_TRACKS } from './demo'
 import { parseChannelName } from './artist'
-import { hasLiveApi, parseIsoDuration, youtubeFetch, type QuotaMeter } from './client'
+import { canReachLiveApi, parseIsoDuration, type QuotaMeter } from './client'
 import type { Track } from './types'
 
 /**
@@ -10,7 +12,27 @@ import type { Track } from './types'
  * stays in one place, and every helper degrades to the built-in demo
  * catalogue when no API key is configured — the product must stay usable
  * before anyone wires up a Google Cloud project.
+ *
+ * The reads go through `cachedFetch` rather than `youtubeFetch` directly.
+ * `search.list` costs 100 units — a hundredth of the day's budget — so a
+ * seed that two visitors type in the same afternoon must be paid for once,
+ * not twice. The cache key is built from the query alone, so the entry is
+ * shared by every visitor, and the ledger records the spend of the call
+ * that actually went out.
  */
+
+/**
+ * Per-request context for a search.
+ *
+ * `sessionId` and `runId` attribute the spend in the quota ledger; the
+ * credential fields let a caller answer with its own API key.
+ */
+export type SearchInit = {
+  sessionId?: string
+  runId?: string
+  accessToken?: string
+  apiKeyOverride?: string
+}
 
 /** One `search.list` hit. */
 export type SearchItem = {
@@ -167,15 +189,19 @@ export function tracksFromVideos(items: VideoItem[]): Track[] {
  * batched; the returned tracks keep the caller's order so a seed's candidate
  * list reads the same way the search did.
  */
-export async function videosByIds(ids: string[], meter: QuotaMeter): Promise<Track[]> {
+export async function videosByIds(
+  ids: string[],
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<Track[]> {
   const unique = [...new Set(ids.filter(Boolean))]
   if (unique.length === 0) return []
-  if (!hasLiveApi()) return demoTracksByIds(unique)
+  if (!canReachLiveApi(init.apiKeyOverride)) return demoTracksByIds(unique)
 
   const byId = new Map<string, Track>()
   for (let index = 0; index < unique.length; index += 50) {
     const batch = unique.slice(index, index + 50)
-    const response = await youtubeFetch<VideoListResponse>(
+    const response = await cachedFetch<VideoListResponse>(
       'videos.list',
       {
         // `status` carries the licence and the madeForKids flag. The
@@ -185,6 +211,7 @@ export async function videosByIds(ids: string[], meter: QuotaMeter): Promise<Tra
         id: batch.join(','),
       },
       meter,
+      init,
     )
     for (const track of tracksFromVideos(response.items ?? [])) {
       byId.set(track.videoId, track)
@@ -203,13 +230,17 @@ export async function videosByIds(ids: string[], meter: QuotaMeter): Promise<Tra
  * instead, so the product is explorable before anyone wires up a Google Cloud
  * project.
  */
-export async function searchSeeds(query: string, meter: QuotaMeter): Promise<Track[]> {
+export async function searchSeeds(
+  query: string,
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<Track[]> {
   const trimmed = query.trim()
   if (!trimmed) return []
 
-  if (!hasLiveApi()) return demoSearch(trimmed)
+  if (!canReachLiveApi(init.apiKeyOverride)) return demoSearch(trimmed)
 
-  const search = await youtubeFetch<SearchResponse>(
+  const search = await cachedFetch<SearchResponse>(
     'search.list',
     {
       part: 'snippet',
@@ -226,6 +257,7 @@ export async function searchSeeds(query: string, meter: QuotaMeter): Promise<Tra
       q: trimmed,
     },
     meter,
+    init,
   )
 
   const ids = (search.items ?? [])
@@ -239,7 +271,7 @@ export async function searchSeeds(query: string, meter: QuotaMeter): Promise<Tra
   // the query has to survive the filter before it can be ranked, and the
   // ranking is what puts the artist's own recordings on top of a page of
   // unrelated uploads.
-  return rankByRelevance(filterTracks(await videosByIds(ids, meter)), trimmed)
+  return rankByRelevance(filterTracks(await videosByIds(ids, meter, init)), trimmed)
 }
 
 /**
@@ -248,12 +280,16 @@ export async function searchSeeds(query: string, meter: QuotaMeter): Promise<Tra
  * This is the artist expansion step of the resolver: the artist channel is
  * the closest thing YouTube offers to "everything by this artist".
  */
-export async function searchByChannelId(channelId: string, meter: QuotaMeter): Promise<Track[]> {
+export async function searchByChannelId(
+  channelId: string,
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<Track[]> {
   const trimmed = channelId.trim()
   if (!trimmed) return []
-  if (!hasLiveApi()) return demoTracksByChannelId(trimmed)
+  if (!canReachLiveApi(init.apiKeyOverride)) return demoTracksByChannelId(trimmed)
 
-  const search = await youtubeFetch<SearchResponse>(
+  const search = await cachedFetch<SearchResponse>(
     'search.list',
     {
       part: 'snippet',
@@ -263,6 +299,7 @@ export async function searchByChannelId(channelId: string, meter: QuotaMeter): P
       maxResults: 25,
     },
     meter,
+    init,
   )
 
   const ids = (search.items ?? [])
@@ -270,7 +307,7 @@ export async function searchByChannelId(channelId: string, meter: QuotaMeter): P
     .filter((id): id is string => Boolean(id))
   if (ids.length === 0) return []
 
-  return videosByIds(ids, meter)
+  return videosByIds(ids, meter, init)
 }
 
 /**
@@ -279,12 +316,16 @@ export async function searchByChannelId(channelId: string, meter: QuotaMeter): P
  * An auto-generated `- Topic` channel is preferred: it is YouTube's own
  * artist entity, so its catalogue is the artist's catalogue.
  */
-export async function resolveChannel(query: string, meter: QuotaMeter): Promise<ResolvedChannel | null> {
+export async function resolveChannel(
+  query: string,
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<ResolvedChannel | null> {
   const trimmed = query.trim()
   if (!trimmed) return null
-  if (!hasLiveApi()) return demoResolveChannel(trimmed)
+  if (!canReachLiveApi(init.apiKeyOverride)) return demoResolveChannel(trimmed)
 
-  const search = await youtubeFetch<SearchResponse>(
+  const search = await cachedFetch<SearchResponse>(
     'search.list',
     {
       part: 'snippet',
@@ -293,6 +334,7 @@ export async function resolveChannel(query: string, meter: QuotaMeter): Promise<
       maxResults: 5,
     },
     meter,
+    init,
   )
 
   const channels = (search.items ?? [])
@@ -315,15 +357,20 @@ export async function resolveChannel(query: string, meter: QuotaMeter): Promise<
  * A pasted channel URL already tells us *which* channel; only the display
  * name is missing, and one cheap `channels.list` call is enough for it.
  */
-export async function channelById(channelId: string, meter: QuotaMeter): Promise<ResolvedChannel | null> {
+export async function channelById(
+  channelId: string,
+  meter: QuotaMeter,
+  init: SearchInit = {},
+): Promise<ResolvedChannel | null> {
   const trimmed = channelId.trim()
   if (!trimmed) return null
-  if (!hasLiveApi()) return demoChannelById(trimmed)
+  if (!canReachLiveApi(init.apiKeyOverride)) return demoChannelById(trimmed)
 
-  const response = await youtubeFetch<ChannelListResponse>(
+  const response = await cachedFetch<ChannelListResponse>(
     'channels.list',
     { part: 'snippet', id: trimmed, maxResults: 1 },
     meter,
+    init,
   )
   const title = response.items?.[0]?.snippet?.title
   if (!title) return null

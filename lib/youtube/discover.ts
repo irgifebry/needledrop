@@ -33,7 +33,12 @@ import { cachedFetch, setCached } from '@/lib/cache'
 import { CACHE_TTL, namespacedKey } from '@/lib/cache/keys'
 import { UNIT_COST } from '@/lib/quota'
 import { assertWithinBudget, budgetStatus } from '@/lib/quota-ledger'
-import { hasLiveApi, parseIsoDuration, YouTubeError, type QuotaMeter } from '@/lib/youtube/client'
+import {
+  canReachLiveApi,
+  isQuotaError,
+  parseIsoDuration,
+  type QuotaMeter,
+} from '@/lib/youtube/client'
 import { orderCandidates, seedArtists, selectPlaylist, toCandidate } from '@/lib/youtube/similar'
 import { topicCategoriesOf, topicNameFromUrl } from '@/lib/youtube/topic'
 
@@ -180,6 +185,14 @@ export type DiscoverContext = {
   sessionId?: string
   /** Run id, so the ledger can attribute the spend to one generation run. */
   runId?: string
+  /**
+   * The visitor's own YouTube API key.
+   *
+   * When set, every call in the run is billed to the visitor's own Google
+   * Cloud project instead of the shared one, so their searches do not eat
+   * the budget everybody else shares.
+   */
+  apiKeyOverride?: string
 }
 
 /* ── the pipeline ───────────────────────────────────────────────────────── */
@@ -198,14 +211,20 @@ export async function discover(
   meter: QuotaMeter,
   context: DiscoverContext = {},
 ): Promise<Candidate[]> {
-  if (!hasLiveApi()) {
+  if (!canReachLiveApi(context.apiKeyOverride)) {
     const demo = discoverDemo(seed, options, context)
     await cacheCandidates(seed, options, demo)
     return demo
   }
 
   const sessionId = context.sessionId ?? 'anonymous'
-  assertWithinBudget(sessionId)
+  // The shared budget caps what the deployment spends on everybody's
+  // behalf. A visitor who brought their own key spends their own quota, so
+  // the shared cap has nothing to say about their run.
+  const onOwnKey = Boolean(context.apiKeyOverride)
+  if (!onOwnKey) {
+    assertWithinBudget(sessionId)
+  }
 
   const depth = context.depth ?? options.depth
   const sources = new Map<string, SourceKind[]>()
@@ -284,7 +303,7 @@ async function collectTrending(
         regionCode: context.region ?? undefined,
       },
       meter,
-      { sessionId: context.sessionId, runId: context.runId },
+      { sessionId: context.sessionId, runId: context.runId, apiKeyOverride: context.apiKeyOverride },
     )
 
     const ids: string[] = []
@@ -324,7 +343,7 @@ async function collectArtistRadio(
       'channels.list',
       { part: 'contentDetails', id: channelId, maxResults: 1 },
       meter,
-      { sessionId: context.sessionId, runId: context.runId },
+      { sessionId: context.sessionId, runId: context.runId, apiKeyOverride: context.apiKeyOverride },
     )
     const uploads = channels.items?.[0]?.contentDetails?.relatedPlaylists?.uploads
     if (!uploads) return
@@ -333,7 +352,7 @@ async function collectArtistRadio(
       'playlistItems.list',
       { part: 'contentDetails', playlistId: uploads, maxResults: 50 },
       meter,
-      { sessionId: context.sessionId, runId: context.runId },
+      { sessionId: context.sessionId, runId: context.runId, apiKeyOverride: context.apiKeyOverride },
     )
     collect(
       sources,
@@ -365,7 +384,7 @@ async function collectCurated(
         'playlistItems.list',
         { part: 'contentDetails', playlistId: entry.id, maxResults: 50 },
         meter,
-        { sessionId: context.sessionId, runId: context.runId },
+        { sessionId: context.sessionId, runId: context.runId, apiKeyOverride: context.apiKeyOverride },
       )
       collect(
         sources,
@@ -443,7 +462,11 @@ async function collectSecondHop(
   const hop1 = buildCandidates(hydrated, sources, seed, options, context)
   const winners = [...hop1].sort((a, b) => b.score - a.score).slice(0, HOP2_SEEDS)
   if (winners.length === 0) return
-  if (!hop2Affordable(context.sessionId ?? 'anonymous', winners.length)) return
+  // A visitor on their own key pays for the hop out of their own quota, so
+  // the shared session budget has no reason to shorten their run.
+  if (!context.apiKeyOverride && !hop2Affordable(context.sessionId ?? 'anonymous', winners.length)) {
+    return
+  }
 
   const found: string[] = []
   for (const winner of winners) {
@@ -487,7 +510,14 @@ async function searchVideoIds(
     'search.list',
     { part: 'snippet', type: 'video', videoCategoryId: '10', maxResults: 50, ...params },
     meter,
-    { sessionId: context.sessionId, runId: context.runId },
+    {
+      sessionId: context.sessionId,
+      runId: context.runId,
+      // Without this the searches would be billed to the shared project
+      // even for a visitor who brought their own key — and these are the
+      // most expensive calls in the whole pipeline.
+      apiKeyOverride: context.apiKeyOverride,
+    },
   )
 
   return (response.items ?? [])
@@ -575,7 +605,7 @@ async function hydrateTracks(
           id: batch.join(','),
         },
         meter,
-        { sessionId: context.sessionId, runId: context.runId },
+        { sessionId: context.sessionId, runId: context.runId, apiKeyOverride: context.apiKeyOverride },
       )
       for (const item of response.items ?? []) {
         const track = trackFromVideo(item)
@@ -864,16 +894,7 @@ function hop2Affordable(sessionId: string, calls: number): boolean {
   return status.used + calls * UNIT_COST.search <= status.sessionBudget
 }
 
-/** Whether an upstream failure means "the quota is gone" (fatal) or not. */
-function isQuotaError(error: unknown): boolean {
-  return (
-    error instanceof YouTubeError &&
-    (error.code === 'quotaExceeded' || error.code === 'dailyLimitExceeded')
-  )
-}
-
 /* ── request identity ───────────────────────────────────────────────────── */
-
 /**
  * A stable identity for the quota ledger, derived from the request.
  *

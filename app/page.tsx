@@ -1,6 +1,5 @@
 import { Hero } from '@/components/hero'
 import { Marquee } from '@/components/marquee'
-import { SiteHeader } from '@/components/site-header'
 import { Toaster } from '@/components/toaster'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Cta } from '@/components/sections/cta'
@@ -15,7 +14,6 @@ import { Stats } from '@/components/sections/stats'
 export default function HomePage() {
   return (
     <TooltipProvider>
-      <SiteHeader />
       <main>
         <Hero />
         <Marquee />
