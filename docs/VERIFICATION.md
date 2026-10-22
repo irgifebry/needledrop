@@ -204,42 +204,100 @@ the confirmation toast.
 
 ---
 
-## 3. Order of operations
+## 4. Brand verification — the two issues Google raised
 
-1. Branding published on project `plucky-agent-464115-b1` — done
-2. Publishing status set to **In production** — done
-3. Domain ownership verified — **still open**, see below
-4. Verification Center → declare scopes → paste the justification → upload the
-   video → **Submit for verification**
+Google's branding review came back with exactly two findings:
 
-Google's published turnaround: brand verification 2–3 business days,
-sensitive scope verification about 10 business days. Estimates vary with
-reviewer responsiveness.
+> *"The website of your home page URL 'https://needdrop.vercel.app' is not
+> registered to you. Verify ownership of your home page, then wait 24 hours
+> before retrying to allow our systems to update."*
+>
+> *"Your logo does not uniquely identify your brand and identity. Configure
+> your app with a logo that reflects your identity and does not impersonate
+> any other brand."*
 
-## 4. The open problem: domain ownership
+### 4.1 The logo — fixed
 
-Brand verification asks for ownership of the authorised domain. The domain
-here is `needdrop.vercel.app`, and two facts get in the way:
+The mark was the letter "N" on a mint square, lifted from the footer
+wordmark. A monogram is the most generic mark there is: it says nothing
+about what the app does and could belong to any product, which is what the
+reviewer objected to.
+
+It is now the product drawn — a record, a tonearm coming in from the top
+right, the stylus dropping onto the groove in orange. `brand/logo-512.png`
+and `brand/logo-120.png`; the reasoning is written up in `brand/README.md`.
+
+Upload `brand/logo-512.png` in the Branding page, then press **Verify
+branding** again.
+
+### 4.2 Domain ownership — the part that is actually blocked
+
+Google wants proof that `needdrop.vercel.app` belongs to this project. Two
+facts get in the way:
 
 1. `vercel.app` is listed in the Public Suffix List, so the top private
-   domain of `needdrop.vercel.app` is `needdrop.vercel.app` itself.
-2. Vercel refuses DNS access for `*.vercel.app` — the API answers
-   `403 forbidden` for both listing and creating records.
+   domain of `needdrop.vercel.app` is `needdrop.vercel.app` itself — the
+   domain to verify is the subdomain, not a registrable domain you bought.
+2. Vercel refuses DNS access for `*.vercel.app`. The API answers
+   `403 forbidden` for listing records *and* for creating them, so a DNS TXT
+   record cannot be published for this domain through Vercel.
 
-So a DNS TXT record cannot be published for this domain through Vercel's
-API. Three ways out, in order of effort:
+That leaves the **HTML file** method: Search Console verifies a URL-prefix
+property by fetching a file from the site root.
 
-- **Check the Vercel dashboard.** Project → Settings → Domains. If there is a
-  DNS or Records section for the project domain, a TXT record can be added
-  there and the domain verified through Search Console. Worth two minutes.
-- **Search Console URL-prefix property.** Verify by HTML file instead of DNS.
-  The file goes at the site root — `public/<googleXXXX>.html`, served with
-  the token in the body. The OAuth console may still require a *domain*
-  property; this is the part that is not settled.
-- **Own the domain.** A domain registered for this project gives full DNS
-  control and makes step 3 a formality. It is an addition, not a change to
-  anything already running.
+```bash
+# 1. search.google.com/search-console → add property
+#    → "URL-prefix" → https://needdrop.vercel.app/
+#    → "HTML file" → download googleXXXX.html
+# 2. write it to the site root
+npm run verify:sc -- googleXXXX.html <token-inside-the-file>
+# 3. commit, let the deploy finish, press Verify in Search Console
+```
 
-Until then, the app works in the unverified state: signing in shows the
-"unverified app" screen, which the user can advance past. The OAuth user
-cap for an unverified app is 100 accounts over the project's whole lifetime.
+`npm run verify:sc` writes `public/<the exact filename>` with the token in
+the body and refuses anything that is not a `google*.html` name. The file is
+committed, so the proof survives a redeploy.
+
+**Whether a URL-prefix property satisfies the brand verification is not
+settled.** Google's branding guidance says to verify ownership "using the
+Google Search Console" without naming the property type, and the console
+asks for the domain to be "registered to you" — language that reads like a
+domain property. If the URL-prefix property is rejected, the fallback is a
+domain this project owns outright, which makes the check a formality.
+
+Note the 24-hour wait Google mentions: after the property is verified, the
+branding review has to be retried, and Google needs up to a day for its own
+systems to pick the change up.
+
+### 4.3 What is *not* required
+
+The Verification Center reports:
+
+> *"Verification is not required since your app is not requesting any
+> sensitive or restricted scopes."*
+
+So `youtube.force-ssl` is classified **non-sensitive** by Google, and this
+app does not need:
+
+- a sensitive scope verification,
+- a scope justification,
+- a demo video.
+
+The `youtube.force-ssl` scope itself is still correct — the Data API
+publishes seven scopes and it is the narrowest one that authorises
+`playlists.insert`. The verification requirement was about the *app* being
+public, not about the scope.
+
+The scope justification in section 1 and the shot list in section 2 are kept
+in this file because the classification is Google's to change, and a
+reclassification would need both again. Until then they are held, not
+required.
+
+### 4.4 Order of operations
+
+1. Branding published, logo replaced — done
+2. Publishing status set to **In production** — done
+3. Domain ownership verified via Search Console — **in progress**
+4. **Verify branding** → wait for "Ready to publish" → **Publish branding**
+5. Sign-in works, and the consent screen shows the app name and logo
+
