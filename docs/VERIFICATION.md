@@ -125,6 +125,51 @@ Google's requirements, quoted:
 Upload it to YouTube Studio with **Visibility: Unlisted**, then paste the
 link into the **YouTube link** field.
 
+### What the demo video must contain
+
+The field on the submit page is *"Demo video: how will the scopes be used?"*
+and it is required. The information box next to it adds three requirements
+that are easy to miss:
+
+> *"Recording your demo for a live application? If your app is already
+> public, do not deploy unverified scopes to your production traffic. This
+> will disrupt your users and may consume your unverified user quota.*
+>
+> *Instead, use one of the following methods to record the video: 1. Staging
+> Environment: Trigger the new scope only in a staging environment or hidden
+> test route. 2. Test Project: Use a separate project for recording.*
+>
+> *Note: The unverified app screen will appear for your test account. This is
+> expected and must be shown in the video."*
+
+And on the field itself:
+
+> *"Your video must include all OAuth clients you assigned to this project."*
+
+Three things follow.
+
+**The unverified app screen must be in the recording.** That is the screen
+with the **Advanced → Go to app (unsafe)** link. It has to be visible, not
+clicked past off-camera — the reviewer is checking that the app behaves as
+it did for the test account. It also settles a question this project kept
+tripping over: the screen is a *warning*, not a hard block, so a test
+account can complete the grant.
+
+**Every OAuth client in the project has to appear.** Check the Clients page
+first and delete any client that is not needed — a second client that was
+created by accident has to be in the video too, and deleting it is easier
+than filming it. The clients page for this project is
+`https://console.cloud.google.com/auth/clients?project=plucky-agent-464115-b1`.
+
+**The branding has to be live before the video is recorded.** The reviewer
+is told to check that the consent screen displays the app name. While the
+branding is still in draft, the consent screen shows no name and no logo,
+and the shot cannot be taken. Look for a **Publish branding** button on the
+Branding page — publishing and verifying are separate steps, and publishing
+may be possible before the review lands. If it is not, the order becomes:
+branding appeal → branding approved → record → submit the scope
+verification.
+
 ### Shot list
 
 **Shot 1 — the app, signed out (10 s)**
@@ -147,7 +192,19 @@ bar changing to `accounts.google.com`.
 > "To write the playlist into your own YouTube account, you sign in. Here
 > is Google's consent screen."
 
-**Shot 3 — the consent screen, static (15 s)**
+**Shot 3 — the unverified app screen (10 s)**
+
+**Keep this on camera.** The test account sees a warning screen saying the
+app has not been verified, with an **Advanced** link. Show it, show the
+Advanced link, and click through it.
+
+> "This is the unverified app screen. The app has not completed Google's
+> verification yet, so Google warns me here. I can go through it under
+> Advanced."
+
+*Why:* the instructions say this screen must appear in the video.
+
+**Shot 4 — the consent screen, static (15 s)**
 
 **Hold this shot long enough for the reviewer to read the address bar.**
 Zoom the browser so both the app name and the URL are legible. The address
@@ -158,14 +215,17 @@ client_id=247187332561-sraf9nfajnbe4jubboqkc1dlfo75spml.apps.googleusercontent.c
 ```
 
 The screen must show the app name **needledrop**, the needledrop logo, the
-support email, and the four scopes. Read the scope list out loud:
+support email, and the scopes. Read the scope list out loud:
 
 > "The app is asking for four permissions. `youtube.force-ssl` to create
 > and edit your playlists. `youtube.readonly` to read your library.
 > `userinfo.email` and `userinfo.profile` to show whose account is signed
 > in."
 
-**Shot 4 — the write scope in action (30 s)**
+*Why:* the reviewer is told to check the app name on the consent screen and
+the client id in the address bar.
+
+**Shot 5 — the write scope in action (30 s)**
 
 Back in the app, with the signed-in state visible. Show the selected tracks,
 edit the playlist title, show the visibility selector sitting on **private**,
@@ -176,14 +236,14 @@ its tracks.
 > my own account, private by default, and I can remove any track before it
 > is created."
 
-**Shot 5 — the read scope in action (15 s)**
+**Shot 6 — the read scope in action (15 s)**
 
 Open the library view showing the playlists that now exist on the account.
 
 > "And this is `youtube.readonly` — the app can see the playlists on my
 > account so it can show me what I already made."
 
-**Shot 6 — privacy and deletion (20 s)**
+**Shot 7 — privacy and deletion (20 s)**
 
 Open https://needdrop.vercel.app/privacy. Scroll to the "Delete
 everything" section, press the delete button, accept the confirmation, show
@@ -192,15 +252,32 @@ the confirmation toast.
 > "The privacy policy is public and it states exactly what is stored. One
 > click deletes everything the app has stored about me."
 
+### Recording setup
+
+- Record on a **test account**: add your Google account as a test user in
+  the Audience page, or be the account that makes the grant. The unverified
+  app screen is expected for that account.
+- Do **not** deploy unverified scopes to real traffic. The deployment has no
+  users yet, so recording against it is fine; a staging deployment or a
+  hidden route is the alternative if traffic arrives.
+- **Unlisted** YouTube video. Public videos get indexed and may be
+  misunderstood as marketing material.
+- Record in **English**.
+- 1080p, voice audible, browser zoom high enough that the address bar and
+  the app name are both legible.
+
 ### Checklist before uploading
 
 - [ ] Recorded in English
+- [ ] The **unverified app screen** is visible in the recording
 - [ ] The app name "needledrop" is legible on the consent screen
 - [ ] The client ID `247187332561-sraf9nfajnbe4jubboqkc1dlfo75spml...` is readable in the address bar
 - [ ] The consent screen is shown, not skipped
 - [ ] Every requested scope is demonstrated
+- [ ] **Every OAuth client in the project** appears — check the Clients page and delete the extras
 - [ ] Uploaded to YouTube as **Unlisted**
 - [ ] Screen recording at 1080p, voice audible
+
 
 ---
 
