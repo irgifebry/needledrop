@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The app runs with no credentials; CI never needs a YouTube key.
+  NODE_ENV: test
+
+jobs:
+  verify:
+    name: lint · typecheck · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          # Node 24 is the floor for ESLint 10 and Vitest 5 alike.
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit and property tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload the build manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-manifest
+          path: .next
+          retention-days: 3
+          include-hidden-files: true
+
+  live-smoke:
+    name: live API smoke (budgeted)
+    # Opt-in: it spends real quota units, so it only runs when the secret
+    # exists and it is explicitly enabled for the branch.
+    if: ${{ github.event_name == 'schedule' || vars.RUN_LIVE_TESTS == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Smoke test against the live Data API
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          RUN_LIVE_TESTS: '1'
+        run: npm run test:live
