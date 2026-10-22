@@ -31,6 +31,9 @@ blob-report/
 .env*.local
 .env.production
 
+# OAuth client secrets downloaded from Google Cloud
+client_secret_*.json
+
 # misc
 .DS_Store
 Thumbs.db
