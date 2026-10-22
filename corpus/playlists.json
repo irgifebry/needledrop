@@ -1,0 +1,10 @@
+{
+  "_comment": "Operator-verified YouTube playlist ids used as a curated discovery source (PLAN-ADDENDUM §34 correction 14). Entries are added by a human AFTER verifying the id resolves, because a fabricated id silently 404s and wastes a quota unit. The file starts empty on purpose: the app must run without it.",
+  "_format": {
+    "id": "the YouTube playlist id, e.g. PLxxxxxxxx",
+    "label": "a human-readable name shown in the UI as the source",
+    "genre": "the genre/topic this list stands for",
+    "verifiedAt": "ISO date the id was last verified"
+  },
+  "playlists": []
+}
