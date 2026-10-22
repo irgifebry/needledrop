@@ -25,5 +25,13 @@ export async function POST() {
   }
 
   await clearSession()
-  return NextResponse.redirect(new URL('/', process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'))
+
+  // 303, not the 307 that `NextResponse.redirect` defaults to. The browser
+  // has to come back with a GET: a 307 would re-issue the POST against the
+  // home page, which has no POST handler — a 405 on the page the user just
+  // signed out of.
+  return NextResponse.redirect(
+    new URL('/', process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
+    303,
+  )
 }

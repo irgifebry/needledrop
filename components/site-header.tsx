@@ -113,13 +113,22 @@ export function SiteHeader() {
       </nav>
 
       {user ? (
-        <a
-          href="/api/auth/logout"
-          className="border-2 px-4 py-2 t-small font-semibold transition-colors hover:bg-current hover:text-ink"
-          style={{ borderColor: 'var(--header-ink)', color: 'var(--header-ink)' }}
-        >
-          {user.name.split(' ')[0]} · Sign out
-        </a>
+        /*
+         * A form, not a link. Signing out revokes a token and clears a
+         * session, and a GET would let a prefetcher or a crawler trigger it
+         * without the user meaning to — so the route is POST-only and the
+         * header posts to it. The form works without JavaScript, and the
+         * 303 the route answers with brings the browser back with a GET.
+         */
+        <form action="/api/auth/logout" method="post">
+          <button
+            type="submit"
+            className="appearance-none border-2 bg-transparent px-4 py-2 font-sans t-small font-semibold transition-colors hover:bg-current hover:text-ink"
+            style={{ borderColor: 'var(--header-ink)', color: 'var(--header-ink)' }}
+          >
+            {user.name.split(' ')[0]} · Sign out
+          </button>
+        </form>
       ) : (
         <button
           type="button"
