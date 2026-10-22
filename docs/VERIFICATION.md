@@ -232,18 +232,57 @@ branding** again.
 
 ### 4.2 Domain ownership — the part that is actually blocked
 
-Google wants proof that `needdrop.vercel.app` belongs to this project. Two
-facts get in the way:
+Google wants proof that `needdrop.vercel.app` belongs to this project. The
+check is a *registration* check, not a "can I serve a file here" check, and
+for a `*.vercel.app` subdomain there is no way to satisfy it. Everything
+below was measured, not assumed:
 
-1. `vercel.app` is listed in the Public Suffix List, so the top private
-   domain of `needdrop.vercel.app` is `needdrop.vercel.app` itself — the
-   domain to verify is the subdomain, not a registrable domain you bought.
-2. Vercel refuses DNS access for `*.vercel.app`. The API answers
-   `403 forbidden` for listing records *and* for creating them, so a DNS TXT
-   record cannot be published for this domain through Vercel.
+| Probe | Result |
+|---|---|
+| Public Suffix List | `vercel.app` **is** a public suffix, so the top private domain of `needdrop.vercel.app` is the subdomain itself |
+| `rdap.org/domain/needdrop.vercel.app` | *"not a valid domain name: Domain name does not have a registry"* — there is no registry record to show a registrant |
+| `rdap.org/domain/vercel.app` | registrar Tucows, nameservers `ns1-4.vercel-dns-3.com` — Vercel's |
+| Vercel API: create a DNS record on the domain | `403 forbidden` — no permission to list *or* create records for `*.vercel.app` |
+| Vercel API: add the domain to the account as an apex domain | `400 invalid_name` — the registration cannot be claimed either |
 
-That leaves the **HTML file** method: Search Console verifies a URL-prefix
-property by fetching a file from the site root.
+So the automated check cannot pass, and no amount of DNS configuration
+changes that: the record it looks for does not exist and cannot be created.
+The file-based route still has value, because it is the evidence a human
+reviewer needs — it proves the developer controls the site.
+
+**The free path is a manual review.** In the branding dialog, choose
+*"I believe the issues found are incorrect"* → **Proceed**, and give the
+reviewer the argument in section 4.2.1.
+
+### 4.2.1 Submission text for the additional review
+
+> The home page domain `needdrop.vercel.app` is a subdomain of `vercel.app`,
+> which is listed in the Public Suffix List. The registrable domain is
+> therefore the subdomain itself, and it has no registry: an RDAP lookup
+> returns "Domain name does not have a registry". `vercel.app` is registered
+> to Vercel, Inc. and its nameservers are Vercel's, so no developer can
+> become the registrant of it, and a registration record naming this
+> developer cannot exist.
+>
+> Control of the site itself is verifiable and has been verified. The
+> Search Console property `https://needdrop.vercel.app/` is owned by the
+> Google account associated with this project, and the site serves Google's
+> own verification file at
+> `https://needdrop.vercel.app/googlebc148e7504272ad6.html`.
+>
+> The application is `https://needdrop.vercel.app`, a YouTube playlist
+> generator. Its privacy policy is at `https://needdrop.vercel.app/privacy`
+> and its source is public at `https://github.com/irgifebry/needledrop`. The
+> OAuth client id `247187332561-sraf9nfajnbe4jubboqkc1dlfo75spml.apps.googleusercontent.com`
+> appears in the address bar of the consent screen.
+>
+> The app is not for personal use: it is a public product with a shared API
+> quota, published for anyone with a Google account.
+
+### 4.2.2 The file-based route, and one thing worth checking
+
+Search Console still verifies a **URL-prefix** property by fetching a file
+from the site root, and that file is the evidence for the manual review:
 
 ```bash
 # 1. search.google.com/search-console → add property
@@ -257,26 +296,23 @@ npm run verify:sc -- path/to/googleXXXX.html
 `npm run verify:sc` copies `public/<the exact filename>` and refuses
 anything that is not a `google*.html` name or does not hold a single
 `google-site-verification: <token>` line. The copy is byte for byte — the
-token in these files is not always a bare string (some carry the file
+token in these files is not always a bare string (this one carries the file
 extension), and the file Google hands out has no trailing newline, so
 regenerating it from the token is a way to fail for no reason.
 
 The download itself lives at the repository root and is git-ignored; the
-copy that belongs in the repository is the one in `public/`.
-
-The file for this project is `public/googlebc148e7504272ad6.html`. It is
-served at:
+copy that belongs in the repository is the one in `public/`. For this
+project that is `public/googlebc148e7504272ad6.html`, served at:
 
 ```
 https://needdrop.vercel.app/googlebc148e7504272ad6.html
 ```
 
-**Whether a URL-prefix property satisfies the brand verification is not
-settled.** Google's branding guidance says to verify ownership "using the
-Google Search Console" without naming the property type, and the console
-asks for the domain to be "registered to you" — language that reads like a
-domain property. If the URL-prefix property is rejected, the fallback is a
-domain this project owns outright, which makes the check a formality.
+Before appealing, check Vercel → Project `needledrop` → Settings → Domains.
+If there is a DNS or Records section for the project domain, a TXT record
+can be published there and a Search Console **domain** property becomes
+possible. The API says no; the dashboard is a different surface and it is
+worth two minutes to look.
 
 Note the 24-hour wait Google mentions: after the property is verified, the
 branding review has to be retried, and Google needs up to a day for its own
