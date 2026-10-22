@@ -48,3 +48,13 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# design-tool scratch
+.taste-skill/
+# The design tool keeps a working copy of the imagery that is served from
+# `public/img/`. Only the licence record is worth keeping in the history.
+assets/*
+!assets/credits.json
+
+# tool caches
+.vitest/
