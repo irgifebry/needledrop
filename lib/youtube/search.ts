@@ -95,6 +95,8 @@ export type ResolvedChannel = {
  * this module has always been the place callers reached for it.
  */
 import { topicNameFromUrl, topicCategoriesOf } from './topic'
+import { filterTracks } from './music'
+import { rankByRelevance } from './query'
 export { topicNameFromUrl }
 
 /**
@@ -176,7 +178,10 @@ export async function videosByIds(ids: string[], meter: QuotaMeter): Promise<Tra
     const response = await youtubeFetch<VideoListResponse>(
       'videos.list',
       {
-        part: 'snippet,topicDetails,contentDetails,statistics',
+        // `status` carries the licence and the madeForKids flag. The
+        // discovery hydrator already asks for it; the seed hydrator did not,
+        // so every seed carried `license: undefined`.
+        part: 'snippet,topicDetails,contentDetails,statistics,status',
         id: batch.join(','),
       },
       meter,
@@ -210,7 +215,14 @@ export async function searchSeeds(query: string, meter: QuotaMeter): Promise<Tra
       part: 'snippet',
       type: 'video',
       videoCategoryId: '10',
-      maxResults: 8,
+      // The Music category holds hour-long radio streams and DJ mixes
+      // alongside the recordings. `medium` (4–20 minutes) drops most of
+      // them on the server, and it costs nothing: a search is charged per
+      // request, not per result, so the wider page is free.
+      videoDuration: 'medium',
+      // The same reason. Eight hits was barely enough to survive the
+      // filter below; twenty-five is still one unit of quota.
+      maxResults: 25,
       q: trimmed,
     },
     meter,
@@ -221,7 +233,13 @@ export async function searchSeeds(query: string, meter: QuotaMeter): Promise<Tra
     .filter((id): id is string => Boolean(id))
   if (ids.length === 0) return []
 
-  return videosByIds(ids, meter)
+  // The server-side filter cannot tell a recording from a radio segment,
+  // and the sources that feed discovery have no server-side filter at all,
+  // so the shape is decided here. The order matters: a track that answers
+  // the query has to survive the filter before it can be ranked, and the
+  // ranking is what puts the artist's own recordings on top of a page of
+  // unrelated uploads.
+  return rankByRelevance(filterTracks(await videosByIds(ids, meter)), trimmed)
 }
 
 /**
