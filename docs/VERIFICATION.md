@@ -249,14 +249,27 @@ property by fetching a file from the site root.
 # 1. search.google.com/search-console → add property
 #    → "URL-prefix" → https://needdrop.vercel.app/
 #    → "HTML file" → download googleXXXX.html
-# 2. write it to the site root
-npm run verify:sc -- googleXXXX.html <token-inside-the-file>
+# 2. copy it to the site root, byte for byte
+npm run verify:sc -- path/to/googleXXXX.html
 # 3. commit, let the deploy finish, press Verify in Search Console
 ```
 
-`npm run verify:sc` writes `public/<the exact filename>` with the token in
-the body and refuses anything that is not a `google*.html` name. The file is
-committed, so the proof survives a redeploy.
+`npm run verify:sc` copies `public/<the exact filename>` and refuses
+anything that is not a `google*.html` name or does not hold a single
+`google-site-verification: <token>` line. The copy is byte for byte — the
+token in these files is not always a bare string (some carry the file
+extension), and the file Google hands out has no trailing newline, so
+regenerating it from the token is a way to fail for no reason.
+
+The download itself lives at the repository root and is git-ignored; the
+copy that belongs in the repository is the one in `public/`.
+
+The file for this project is `public/googlebc148e7504272ad6.html`. It is
+served at:
+
+```
+https://needdrop.vercel.app/googlebc148e7504272ad6.html
+```
 
 **Whether a URL-prefix property satisfies the brand verification is not
 settled.** Google's branding guidance says to verify ownership "using the

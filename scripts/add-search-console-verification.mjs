@@ -1,53 +1,61 @@
 #!/usr/bin/env node
 /**
- * Add a Google Search Console verification file to `public/`.
+ * Put a Google Search Console verification file at the site root.
  *
  * Search Console offers two ways to prove a domain is yours: a DNS TXT
  * record, or a file at the site root. The DNS route is closed for
  * `*.vercel.app` — Vercel refuses DNS records for those subdomains — so the
  * HTML file is the way through, and the file has to be served from the root
- * with an exact name.
+ * under the exact name Google chose.
  *
  * Usage:
- *   npm run verify:sc -- google1a2b3c4d5e6f.html 1a2b3c4d5e6f7890
+ *   npm run verify:sc -- path/to/googleXXXX.html
  *
- * The filename and the token come from Search Console: add the property,
- * choose the "HTML file" method, and download the file. Its name is the
- * first argument and the token inside it is the second.
+ * The file is copied byte for byte. It is not regenerated from the token:
+ * the token in these files is not always a bare string — some of them carry
+ * the file extension — and the file Google hands out has no trailing
+ * newline. Verifying is an exact comparison, so rewriting it is a way to
+ * fail for no reason.
  *
- * The file is committed, so the proof is in the history and a fresh deploy
+ * The copy is committed, so the proof is in the history and a redeploy
  * cannot lose it.
  */
 
-import { writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { copyFile, readFile, writeFile } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 
-const [filename, token] = process.argv.slice(2)
+const [source] = process.argv.slice(2)
 
-if (!filename || !token) {
-  console.error('Usage: npm run verify:sc -- <googleXXXX.html> <token>')
+if (!source) {
+  console.error('Usage: npm run verify:sc -- <path/to/googleXXXX.html>')
   process.exit(1)
 }
 
 // Google names the file google<hash>.html. Anything else is a typo, and a
 // stray file at the site root is worse than no file at all.
-if (!/^google[a-zA-Z0-9_-]+\.html$/.test(filename)) {
-  console.error(`\`${filename}\` is not a Google verification filename (expected googleXXXX.html).`)
+const name = basename(source)
+if (!/^google[a-zA-Z0-9_.-]+\.html$/.test(name)) {
+  console.error(`\`${name}\` is not a Google verification filename (expected googleXXXX.html).`)
   process.exit(1)
 }
 
-// The token is the value after the colon in the file Google hands out.
-if (!/^[a-zA-Z0-9_-]{20,}$/.test(token)) {
-  console.error('The token looks wrong — it should be a long alphanumeric string.')
+const body = await readFile(source, 'utf8')
+
+// The body is one line: `google-site-verification: <token>`. Checking the
+// shape catches a file that was truncated in transit, or an HTML error page
+// that was saved under the verification name.
+if (!/^google-site-verification:\s*\S+\s*$/.test(body.trim())) {
+  console.error('That file does not look like a Search Console verification file.')
+  console.error('Expected a single line: google-site-verification: <token>')
   process.exit(1)
 }
 
-const target = join(process.cwd(), 'public', filename)
-const body = `google-site-verification: ${token}\n`
-
+const target = join(process.cwd(), 'public', name)
 await writeFile(target, body, 'utf8')
+await copyFile(source, target)
 
-console.log(`Wrote public/${filename}`)
-console.log(`  https://${process.env.NEXT_PUBLIC_APP_URL ?? 'localhost:3000'}/${filename}`)
+const origin = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+console.log(`Wrote public/${name} (${Buffer.byteLength(body)} bytes, verbatim)`)
+console.log(`  ${origin.replace(/\/$/, '')}/${name}`)
 console.log('')
-console.log('Next: commit it and let the deploy finish, then press Verify in Search Console.')
+console.log('Next: commit it, let the deploy finish, then press Verify in Search Console.')

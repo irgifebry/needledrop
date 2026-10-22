@@ -34,6 +34,10 @@ blob-report/
 # OAuth client secrets downloaded from Google Cloud
 client_secret_*.json
 
+# Search Console verification files, as downloaded. The copy that belongs in
+# the repository lives in public/ — see scripts/add-search-console-verification.mjs
+/google*.html
+
 # misc
 .DS_Store
 Thumbs.db
