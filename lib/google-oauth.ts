@@ -5,8 +5,27 @@ const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
 
+/**
+ * The scopes the app asks for.
+ *
+ * There is no `youtube.playlists` scope. The Data API has never published
+ * one, and a request that names it comes back as `invalid_scope` — the
+ * consent screen answers with the list of scopes it *can* satisfy, and the
+ * name it does not recognise is the one in the request. The write side of
+ * the playlist API is covered by `youtube.force-ssl`, which is `youtube`
+ * with the SSL requirement made explicit and is what Google recommends
+ * for new integrations.
+ *
+ * `youtube.readonly` covers the read side (`playlists.list`,
+ * `playlistItems.list`), and the two `userinfo` scopes carry the identity
+ * the session cookie holds.
+ *
+ * The set is pinned by `tests/contract/oauth-scopes.test.ts`: every scope
+ * here must be one Google actually publishes, or the consent screen
+ * rejects the whole request and nobody can sign in at all.
+ */
 export const SCOPES = [
-  'https://www.googleapis.com/auth/youtube.playlists',
+  'https://www.googleapis.com/auth/youtube.force-ssl',
   'https://www.googleapis.com/auth/youtube.readonly',
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
