@@ -13,7 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
+import { Button, ButtonLink } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
@@ -21,6 +21,7 @@ import { Slider } from '@/components/ui/slider'
 import { Popover } from '@/components/ui/popover'
 import { RadioGroup, RadioCard } from '@/components/ui/radio-group'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ExportOptions } from '@/components/export-options'
 import { formatDuration } from '@/lib/format'
 import { DAILY_QUOTA, estimateDiscoveryUnits, estimatePlaylistUnits, formatUnits } from '@/lib/quota'
 import { DEFAULT_OPTIONS, type Candidate, type DiscoveryOptions, type Track } from '@/lib/youtube/types'
@@ -56,6 +57,16 @@ export function Generator() {
   const [demoMode, setDemoMode] = useState(false)
   const [title, setTitle] = useState('')
   const [privacy, setPrivacy] = useState<'private' | 'unlisted' | 'public'>('private')
+  /**
+   * Whether a Google account is attached. `null` means "not known yet" — the
+   * session is fetched on mount, and until it lands neither the YouTube
+   * controls nor the sign-in prompt are shown, so nothing flashes.
+   *
+   * The app has no shared client state — the header keeps its own copy of
+   * the same session — so this is a second, independent read of one cheap
+   * endpoint rather than a new provider.
+   */
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -63,6 +74,21 @@ export function Generator() {
       .then((response) => response.json())
       .then((data: { demo: boolean }) => setDemoMode(Boolean(data.demo)))
       .catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/auth/session')
+      .then((response) => response.json())
+      .then((data: { signedIn: boolean }) => {
+        if (!cancelled) setSignedIn(Boolean(data.signedIn))
+      })
+      .catch(() => {
+        if (!cancelled) setSignedIn(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -177,6 +203,16 @@ export function Generator() {
 
   const playlistUnits = estimatePlaylistUnits(chosen.length)
   const discoveryUnits = estimateDiscoveryUnits()
+
+  /**
+   * Whether a playlist can be written at all.
+   *
+   * A Google account is what a real write needs. Demo mode is the other
+   * case: with no API key the route answers with a demo result rather than
+   * a 401, so the visitor still gets to see what a finished playlist looks
+   * like — which is worth keeping.
+   */
+  const canCreate = signedIn === true || demoMode
 
   function toggle(videoId: string) {
     setPicked((current) => {
@@ -553,46 +589,71 @@ export function Generator() {
                 />
               </label>
 
-              <RadioGroup
-                value={privacy}
-                onValueChange={(value) => setPrivacy(value as typeof privacy)}
-                aria-label="Playlist privacy"
-                className="grid-cols-1 sm:grid-cols-3"
-              >
-                <RadioCard value="private">
-                  <Lock className="size-4 shrink-0" />
-                  <span className="t-small font-semibold">Private</span>
-                </RadioCard>
-                <RadioCard value="unlisted">
-                  <span className="t-small font-semibold">Unlisted</span>
-                </RadioCard>
-                <RadioCard value="public">
-                  <span className="t-small font-semibold">Public</span>
-                </RadioCard>
-              </RadioGroup>
+              {canCreate && (
+                <>
+                  <RadioGroup
+                    value={privacy}
+                    onValueChange={(value) => setPrivacy(value as typeof privacy)}
+                    aria-label="Playlist privacy"
+                    className="grid-cols-1 sm:grid-cols-3"
+                  >
+                    <RadioCard value="private">
+                      <Lock className="size-4 shrink-0" />
+                      <span className="t-small font-semibold">Private</span>
+                    </RadioCard>
+                    <RadioCard value="unlisted">
+                      <span className="t-small font-semibold">Unlisted</span>
+                    </RadioCard>
+                    <RadioCard value="public">
+                      <span className="t-small font-semibold">Public</span>
+                    </RadioCard>
+                  </RadioGroup>
 
-              <div className="flex items-baseline justify-between t-small">
-                <span className="text-paper/65">This run will cost</span>
-                <span className="tnum font-semibold">
-                  {formatUnits(playlistUnits + discoveryUnits)} of {formatUnits(DAILY_QUOTA)}
-                </span>
-              </div>
+                  <div className="flex items-baseline justify-between t-small">
+                    <span className="text-paper/65">This run will cost</span>
+                    <span className="tnum font-semibold">
+                      {formatUnits(playlistUnits + discoveryUnits)} of {formatUnits(DAILY_QUOTA)}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {signedIn === false && !demoMode && (
+                <div className="flex flex-col gap-2 border-2 border-paper/20 p-3">
+                  <p className="t-small text-paper/75">
+                    Writing the playlist into your own YouTube account needs a Google sign-in. You
+                    can still take the list with you — every format below carries the whole
+                    tracklist.
+                  </p>
+                  <ButtonLink href="/api/auth/google" variant="outline" size="sm" className="self-start">
+                    Sign in with Google
+                  </ButtonLink>
+                </div>
+              )}
 
               {error && <p className="t-small text-orange">{error}</p>}
 
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Button onClick={() => void runCreate()} disabled={busy === 'create'} block>
-                  {busy === 'create' ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <ArrowRight className="size-4" />
-                  )}
-                  Create playlist
-                </Button>
+                {canCreate && (
+                  <Button onClick={() => void runCreate()} disabled={busy === 'create'} block>
+                    {busy === 'create' ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <ArrowRight className="size-4" />
+                    )}
+                    Create playlist
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => void runDiscover()} disabled={busy === 'discover'}>
                   Re-run
                 </Button>
               </div>
+
+              <ExportOptions
+                tracks={chosen}
+                title={title}
+                heading={canCreate ? 'Or take the list with you' : 'Take the list with you'}
+              />
             </div>
           </div>
         )}
@@ -650,6 +711,8 @@ export function Generator() {
                 />
               ))}
             </div>
+
+            <ExportOptions tracks={chosen} title={title} />
 
             <Button variant="outline" onClick={reset}>
               Start another
