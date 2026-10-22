@@ -318,26 +318,60 @@ Note the 24-hour wait Google mentions: after the property is verified, the
 branding review has to be retried, and Google needs up to a day for its own
 systems to pick the change up.
 
-### 4.3 The scope classification was never actually tested
+### 4.3 Both YouTube scopes are sensitive — confirmed
 
-The Verification Center reports:
+This is settled now, and the earlier reading was wrong. The Verification
+Center reported:
 
 > *"Verification is not required since your app is not requesting any
 > sensitive or restricted scopes."*
 
 That was true for a reason that had nothing to do with the classification
-of `youtube.force-ssl`: **no scopes were declared at all.** The Data access
-summary on the Prepare-for-verification page renders *"No rows to display"*.
-An empty declaration is trivially free of sensitive scopes.
+of the scopes: **no scopes were declared at all.** The Data access summary
+renders *"No rows to display"*, and an empty declaration is trivially free
+of sensitive scopes. The Data Access page is the authority, and once the
+scopes are declared it puts them under **"Your sensitive scopes"** with
+*"Approval required."* and a **"This scope is not yet verified"** flag on
+each:
 
-So the classification of `youtube.force-ssl` is still unknown. Declare the
-scopes (section 5.1) and re-read the status; if it changes, the scope
-justification in section 1 and the demo video in section 2 come back into
-play. Until then they are held, not required.
+| Scope | Google classifies it |
+|---|---|
+| `youtube.force-ssl` | **sensitive** — approval required |
+| `youtube.readonly` | **sensitive** — approval required |
+| `userinfo.email` | non-sensitive |
+| `userinfo.profile` | non-sensitive |
 
-The scope choice itself is not in question — the Data API publishes seven
+So the app does need, after all:
+
+- a scope justification,
+- a demo video,
+- and the approval itself — which is what the `access_denied` at sign-in
+  was about.
+
+The scope choice itself was never in question: the Data API publishes seven
 scopes and `youtube.force-ssl` is the narrowest one that authorises
 `playlists.insert`.
+
+### 4.3.1 Do not leave Google's boilerplate descriptions
+
+The Data Access page pre-fills `youtube.force-ssl` with Google's generic
+text:
+
+> *"See, edit, and permanently delete your YouTube videos, ratings, comments
+> and captions"*
+
+The app never touches a video. Leaving that description in place invites the
+exact question a reviewer should ask — *why does a playlist generator need
+to delete videos?* — and the honest answer is "it doesn't". The description
+is what the user reads on the consent screen, so it should describe what
+the scope is actually used for. Override both:
+
+| Scope | Description to use |
+|---|---|
+| `youtube.force-ssl` | Create and edit playlists in your YouTube account |
+| `youtube.readonly` | See the playlists and videos in your YouTube library |
+| `userinfo.email` | Know your email address so the site can show which account is signed in |
+| `userinfo.profile` | Know your display name so the site can show which account is signed in |
 
 ### 4.4 Order of operations
 
@@ -371,10 +405,34 @@ consent screen, so they are written for them, not for a reviewer:
 | `userinfo.email` | Know your email address so the site can show which account is signed in |
 | `userinfo.profile` | Know your display name so the site can show which account is signed in |
 
-Adding them also settles the question in section 4.3. Re-read the
-Verification Center's data access status afterwards: if `youtube.force-ssl`
-turns out to be sensitive, the scope justification in section 1 and the demo
-video in section 2 come back into play.
+Adding them also settles the question in section 4.3 — and the answer is
+that both YouTube scopes need approval.
+
+### 5.1.1 "How will the scopes be used?" — the justification field
+
+The Data Access page has a required free-text field, *"How will the scopes
+be used?"*. This is the same justification as section 1, trimmed to fit a
+1000-character box. The full version stays in section 1; this is the one to
+paste.
+
+> needledrop creates playlists in the user's own YouTube account. It reads
+> public YouTube metadata to score candidate tracks, then writes the chosen
+> tracks into a new playlist.
+>
+> youtube.force-ssl authorises three kinds of write on the signed-in user's
+> own data: playlists.insert creates it, playlistItems.insert adds the
+> tracks, and the update and delete methods let the user rename, re-describe,
+> change visibility or remove a row before committing. youtube.readonly reads
+> the playlists and library items the app displays.
+>
+> There is no narrower scope. The Data API publishes seven scopes; only
+> youtube, youtube.force-ssl and youtubepartner authorise playlists.insert,
+> and youtube.readonly cannot create anything. We did not request youtube or
+> youtube.upload, so the app can never upload or edit videos. It never reads
+> watch history, likes or comments, and never trains a model on the data.
+>
+> Tokens and the email address live in one AES-256-GCM encrypted, httpOnly
+> cookie, never logged.
 
 ### 5.2 Appeal reasons
 
