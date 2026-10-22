@@ -141,10 +141,15 @@ export async function createPlaylist(
     meter,
     { accessToken },
   )
-  const positions = (verify.items ?? [])
-    .map((item) => item.snippet?.position ?? 0)
-    .sort((a, b) => a - b)
-  const ordered = positions.every((position, index) => position === index)
+  // The listing comes back in playlist order, so the positions have to be
+  // read as they are. Sorting them here would make the check below
+  // tautological — a shuffled list would be sorted back into 0, 1, 2 and
+  // reported as fine — and the count has to be compared as well, or a
+  // playlist that lost a track would still pass.
+  const positions = (verify.items ?? []).map((item) => item.snippet?.position ?? 0)
+  const ordered =
+    positions.length === input.videoIds.length &&
+    positions.every((position, index) => position === index)
 
   const note = ordered
     ? undefined
