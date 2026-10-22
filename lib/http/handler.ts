@@ -7,7 +7,6 @@ import { logger, newRequestId } from '@/lib/observability/logger'
 import { withSpan } from '@/lib/observability/tracing'
 import { readUserApiKey } from '@/lib/session'
 import { createMeter, isQuotaError, YouTubeError, type QuotaMeter } from '@/lib/youtube/client'
-import { SpotifyError } from '@/lib/spotify/client'
 
 import { AppError, type ErrorCode } from './errors'
 import { checkRateLimit, clientKey } from './rate-limit'
@@ -162,10 +161,6 @@ export function mapError(error: unknown): Mapped {
     if (error.status === 404) {
       return { code: 'not_found', message: error.message, status: 404 }
     }
-    return { code: 'upstream_error', message: error.message, status: 502 }
-  }
-
-  if (error instanceof SpotifyError) {
     return { code: 'upstream_error', message: error.message, status: 502 }
   }
 

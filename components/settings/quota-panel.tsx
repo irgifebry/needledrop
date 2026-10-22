@@ -115,8 +115,10 @@ export function QuotaPanel() {
         <div className="border-2 border-orange bg-paper p-5">
           <p className="t-title font-semibold text-orange">Demo mode.</p>
           <p className="t-body mt-2 text-ink/80">
-            The app is running against the built-in catalogue. Nothing is being written to YouTube,
-            and discovery is not spending the shared quota. Add a YouTube API key below to go live.
+            Searches and playlist building are using the built-in demo catalogue. Nothing is being
+            written to YouTube, and discovery is not spending the shared quota. Add your own YouTube
+            Data API key in Settings to search live YouTube tracks. Sign-in is still only needed when
+            you choose to save a finished playlist.
           </p>
         </div>
       ) : null}
@@ -127,8 +129,8 @@ export function QuotaPanel() {
             {data.budget.globalExceeded ? 'The shared daily budget is spent.' : 'This session is over its budget.'}
           </p>
           <p className="t-body mt-2 text-ink/80">
-            The daily quota resets at midnight Pacific Time. You can also add your own YouTube API
-            key (below) to keep going on your own quota right now.
+            The daily quota resets at midnight Pacific Time. You can add your own YouTube Data API
+            key in Settings to search live YouTube tracks using your own quota.
           </p>
         </div>
       ) : null}

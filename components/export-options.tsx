@@ -16,11 +16,11 @@ import type { Track } from '@/lib/youtube/types'
  * when a user wants to save the list they already have.
  *
  * The formats are deliberately metadata and links only: no audio is ever
- * fetched, and the files are the ones a third-party converter can read.
+ * fetched, and the files are local copies of the YouTube tracklist.
  */
 
 const FORMATS: Array<{ id: ExportFormat; label: string; hint: string }> = [
-  { id: 'm3u', label: 'm3u', hint: 'A playlist file — for a player or a converter' },
+  { id: 'm3u', label: 'm3u', hint: 'A local playlist file' },
   { id: 'csv', label: 'csv', hint: 'The tracklist as a spreadsheet' },
   { id: 'json', label: 'json', hint: 'Every field, for rebuilding the list elsewhere' },
   { id: 'text', label: 'txt', hint: 'A plain list you can paste anywhere' },
@@ -80,8 +80,8 @@ export function ExportOptions({
         ))}
       </div>
       <p className="t-small text-paper/60">
-        Metadata and links only — no audio is downloaded. Import the list into YouTube Music, or
-        hand it to a converter for another service.
+        Metadata and links only — no audio is downloaded. Download the list for your records or
+        playlist saving in needledrop is to YouTube Music.
       </p>
     </div>
   )

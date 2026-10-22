@@ -29,14 +29,14 @@ const SECTIONS: Array<{ heading: string; body: string[]; list?: string[] }> = [
   {
     heading: 'The short version',
     body: [
-      'needledrop reads YouTube metadata — titles, channels, topics, durations, view counts — to find tracks that belong with the one you dropped. It writes playlists to your own YouTube account. It never downloads audio, and it never sends your listening habits anywhere else.',
-      'Signing in is optional. Without an account you can still discover tracks and export a playlist; you just cannot write it to YouTube.',
+      'needledrop searches YouTube for tracks and generates playlists from track metadata such as titles, artists, channels, topics and durations. The app does not download or analyze audio.',
+      'You can search and generate a playlist without signing in. Google sign-in is needed only when you choose to save a playlist to YouTube Music or use Google-account features.',
     ],
   },
   {
     heading: 'What we access from Google',
     body: [
-      'We ask for four permissions, and only when you press sign-in. You can withdraw any of them at any time from your Google account.',
+      'Google sign-in is optional and is used when you choose to save a playlist to YouTube Music or use Google-account features. You can withdraw access at any time from your Google account.',
     ],
     list: [
       'youtube.force-ssl — create and edit playlists in your own account. This is the permission behind the "Create playlist" button.',
@@ -47,14 +47,16 @@ const SECTIONS: Array<{ heading: string; body: string[]; list?: string[] }> = [
   {
     heading: 'Why we need them',
     body: [
-      'Each permission is tied to one feature. The engine reads public metadata with a shared API key and never asks for your account. The moment you want a playlist written into your own YouTube account, we need write access to playlists and nothing else — no videos, no uploads, no comments, no viewing history.',
-      'We do not request your watch history, subscriptions, likes or any other signal about what you listen to. The engine is driven by the track you drop, not by a profile of you.',
+      'Google playlist and library permissions support the Google-account features shown in the app, including saving playlists to YouTube Music. Google sign-in is not required to search or generate a playlist. YouTube searches use a project API key or, if you provide one, your own YouTube API key.',
+      'The app does not request your watch history, subscriptions or likes to generate recommendations. Playlist generation uses track metadata and the tracks and options you provide or select; this is not a profile built from your listening history.',
     ],
   },
   {
     heading: 'What we store',
     body: [
-      'Your OAuth access and refresh tokens, your email address and your display name are held in a single encrypted cookie named needledrop_session. It is encrypted with AES-256-GCM, marked httpOnly so scripts cannot read it, marked Secure so it only travels over HTTPS, and expires after 30 days. It is never written to a log.',
+      'Google OAuth tokens, email address and display name are held in the encrypted needledrop_session cookie. It is sealed using AES-256-GCM, marked httpOnly and sameSite=lax, and set Secure in production; it expires after 30 days.',
+      'If you provide your own YouTube Data API key, it is stored separately in the encrypted needledrop_apikey cookie, so it remains independent of signing in or out. It is sealed using AES-256-GCM, marked httpOnly and sameSite=lax, and set Secure in production; it expires after 30 days. The key is not sent back to the browser in API responses.',
+      'During Google sign-in, a separate httpOnly, sameSite=lax OAuth state cookie is used briefly to validate the sign-in response and is cleared after the callback; it expires after 10 minutes.',
       'Separately, an anonymous identifier named needledrop_anon ties together the things you do without an account: saved presets, blocked tracks, keep/drop feedback and run history. That identifier is a random value in a signed cookie — it is not derived from your email address, your IP address or anything about your device, and it is not linked to your Google account.',
       'If a database is configured, those rows are persisted in it. If no database is configured, they live in the memory of the running process and disappear when the process restarts.',
     ],
@@ -62,9 +64,8 @@ const SECTIONS: Array<{ heading: string; body: string[]; list?: string[] }> = [
   {
     heading: 'What we never do',
     list: [
-      'We never download, cache, remix or separate audio. Every recommendation is made from metadata.',
-      'We never sell, rent or share your data with advertisers or data brokers. There are no third-party trackers on this site.',
-      'We never use Google user data to train a machine-learning model, and we never hand it to anyone who would.',
+      'We do not download or analyze audio. Playlist search and generation use metadata.',
+      'We do not use Google user data to train a machine-learning model.',
       'We never log an access token, a refresh token or a client secret.',
     ],
     body: [],
@@ -72,7 +73,7 @@ const SECTIONS: Array<{ heading: string; body: string[]; list?: string[] }> = [
   {
     heading: 'How long we keep it',
     body: [
-      'The session cookie lives for 30 days and is replaced by a fresh one whenever the token is refreshed. Signing out revokes the refresh token on Google’s side first, then clears the cookie locally — a leaked cookie cannot be replayed afterwards.',
+      'The Google session and BYO YouTube API key cookies each have a 30-day lifetime. Signing out of Google attempts to revoke its refresh token before clearing the local cookie. Clearing your YouTube API key removes its separate cookie.',
       'Presets, blocks, feedback and run history are kept until you delete them. There is no other retention schedule and no secondary use.',
     ],
   },
@@ -80,14 +81,14 @@ const SECTIONS: Array<{ heading: string; body: string[]; list?: string[] }> = [
     heading: 'Limited Use disclosure',
     body: [
       'needledrop’s use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.',
-      'Data obtained from Google APIs is used only to build and write the playlist you asked for on the account you signed in with. It is not used for advertising, not sold, not shared beyond the hosting and API providers described below, and not used to train any model.',
+      'Google user data is used to provide the Google-account features you request, such as reading or writing playlists. It is not used for advertising or to train a machine-learning model. Any transfer or use of Google user data is limited to providing or improving the app’s user-facing features, in accordance with the Google API Services User Data Policy and its Limited Use requirements.',
     ],
   },
   {
     heading: 'Who else is involved',
     body: [
-      'Google provides the data and the identity. Vercel hosts the site and the API. Both are subject to their own privacy policies: Google’s API Services User Data Policy and Vercel’s privacy policy.',
-      'The shared YouTube API key used for public metadata is issued by Google to this project and is not tied to your account.',
+      'The app sends search requests to YouTube as needed to find track metadata. When you choose to save a playlist to YouTube Music, the playlist request is sent to Google using your Google authorization. Vercel hosts the site and API. These services are subject to their own privacy policies and terms.',
+      'YouTube searches use a shared project API key unless you configure your own key. The shared key is issued to this project and is not tied to your account. If you provide your own key, it is used for your YouTube API requests as described above.',
     ],
     list: [
       'YouTube Terms of Service — youtube.com/t/terms',
@@ -152,10 +153,13 @@ export default function PrivacyPage() {
             <section className="border-t-2 border-ink/15 py-8">
               <h2 className="t-title font-semibold">Delete everything</h2>
               <p className="t-body mt-4 leading-relaxed text-ink/80">
-                Signing out revokes your Google token and clears the session cookie. The button below
-                additionally erases every row stored under your anonymous identifier — presets,
-                blocks, feedback and run history — and then rotates that identifier so the old
-                cookie cannot reach anything. It cannot be undone.
+                Sign out revokes your Google token when possible and clears your Google session
+                cookie; it does not clear your saved YouTube API key.
+                Delete all my data erases rows stored under your anonymous identifier — presets,
+                blocks, feedback and run history — and rotates that identifier so the old cookie
+                cannot reach anything. It does not delete playlists already saved to Google or
+                Google, or clear your Google sign-in session or saved API key. Deletion cannot be
+                undone.
               </p>
               <div className="mt-6">
                 <DataControls />

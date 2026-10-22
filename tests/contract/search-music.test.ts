@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { resetCache } from '@/lib/cache'
 import { createMeter } from '@/lib/youtube/client'
-import { searchSeeds } from '@/lib/youtube/search'
+import { searchByChannelId, searchSeeds } from '@/lib/youtube/search'
 
 /**
  * The search must answer the question that was asked.
@@ -173,6 +173,27 @@ describe('the search keeps the recordings and drops everything else', () => {
     const tracks = await searchSeeds('jazz', createMeter())
 
     expect(tracks).toHaveLength(1)
+  })
+})
+
+describe('artist channel expansion uses the same music-only filter', () => {
+  it('drops music-video and lyric-video uploads while keeping official audio', async () => {
+    installFetch((url) => {
+      if (url.pathname.endsWith('/search')) {
+        return jsonResponse({ items: [hit('official-audio'), hit('music-video'), hit('lyric-video')] })
+      }
+      return jsonResponse({
+        items: [
+          video('official-audio', { title: 'A Song (Official Audio)', channelTitle: 'Artist - Topic' }),
+          video('music-video', { title: 'A Song (Official Music Video)' }),
+          video('lyric-video', { title: 'A Song (Lyric Video)' }),
+        ],
+      })
+    })
+
+    const tracks = await searchByChannelId('UC_artist', createMeter())
+
+    expect(tracks.map((track) => track.videoId)).toEqual(['official-audio'])
   })
 })
 

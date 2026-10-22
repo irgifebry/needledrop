@@ -12,7 +12,7 @@ export type M3uOptions = {
   /**
    * Emit the extended directive (`tvg-id`, `tvg-name`, `artist`) understood by
    * IPTV-style players. Off by default because the plain form is what generic
-   * players and third-party converters expect.
+   * music players expect.
    */
   extended?: boolean
 }

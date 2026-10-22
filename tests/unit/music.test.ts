@@ -76,6 +76,29 @@ describe('isTrack', () => {
     expect(isTrack(makeTrack({ durationSec: TRACK_MIN_SEC - 1 }))).toBe(false)
     expect(isTrack(makeTrack({ durationSec: TRACK_MAX_SEC + 1 }))).toBe(false)
   })
+
+  it.each([
+    'Song Name (Official Music Video)',
+    'Song Name - Music Video',
+    'Song Name (Lyric Video)',
+    'Song Name - Lyrics',
+    'Artist - Song (M/V)',
+    'Artist - Song [Official MV]',
+  ])('excludes video-marked title: %s', (title) => {
+    expect(isTrack(makeTrack({ title, durationSec: 200 }))).toBe(false)
+  })
+
+  it('retains official audio and Topic-channel recordings', () => {
+    expect(
+      isTrack(
+        makeTrack({
+          title: 'Song Name (Official Audio)',
+          channelTitle: 'Artist - Topic',
+          durationSec: 200,
+        }),
+      ),
+    ).toBe(true)
+  })
 })
 
 describe('filterTracks', () => {

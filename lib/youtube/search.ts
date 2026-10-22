@@ -307,7 +307,7 @@ export async function searchByChannelId(
     .filter((id): id is string => Boolean(id))
   if (ids.length === 0) return []
 
-  return videosByIds(ids, meter, init)
+  return filterTracks(await videosByIds(ids, meter, init))
 }
 
 /**

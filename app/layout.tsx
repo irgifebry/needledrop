@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next'
 import { Anton, Work_Sans } from 'next/font/google'
 import './globals.css'
 import { SiteHeader } from '@/components/site-header'
-import { readSession } from '@/lib/session'
 
 const anton = Anton({
   weight: '400',
@@ -21,12 +20,12 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
   title: 'needledrop. Drop the needle on one track. Get the whole session.',
   description:
-    'A YouTube Music playlist generator. Paste one track you love and get twenty more that belong with it. Metadata only, quota-aware, and every score explained.',
+    'Search YouTube for a track you love, discover songs that fit, then save your playlist to YouTube Music. Metadata only, quota-aware, and every score explained.',
   applicationName: 'needledrop',
   openGraph: {
     title: 'needledrop. Drop the needle on one track. Get the whole session.',
     description:
-      'Paste one track. Get a real playlist on your YouTube Music account. Quota-aware, explainable, metadata only.',
+      'Search one track. Discover songs that fit. Save a playlist to YouTube Music. Quota-aware, explainable, metadata only.',
     type: 'website',
     siteName: 'needledrop',
   },
@@ -34,7 +33,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'needledrop. Drop the needle on one track. Get the whole session.',
     description:
-      'Paste one track. Get a real playlist on your YouTube Music account. Quota-aware, explainable, metadata only.',
+      'Search one track. Discover songs that fit. Save a playlist to YouTube Music. Quota-aware, explainable, metadata only.',
   },
 }
 
@@ -44,9 +43,7 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await readSession()
-  const initialUser = session ? { name: session.name, email: session.email } : null
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
@@ -67,7 +64,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body>
-        <SiteHeader initialUser={initialUser} />
+        <SiteHeader />
         {children}
       </body>
     </html>

@@ -104,38 +104,3 @@ export async function clearUserApiKey(): Promise<void> {
   const store = await cookies()
   store.delete(API_KEY_COOKIE)
 }
-
-/* ── Spotify session ─────────────────────────────────────────────────────── */
-
-export type SpotifySession = {
-  accessToken: string
-  refreshToken: string
-  expiresAt: number
-  spotifyUserId: string
-  displayName: string
-}
-
-const SPOTIFY_COOKIE = 'needledrop_spotify'
-
-export async function readSpotifySession(): Promise<SpotifySession | null> {
-  const store = await cookies()
-  const raw = store.get(SPOTIFY_COOKIE)?.value
-  if (!raw) return null
-  return open<SpotifySession>(raw)
-}
-
-export async function writeSpotifySession(session: SpotifySession): Promise<void> {
-  const store = await cookies()
-  store.set(SPOTIFY_COOKIE, seal(session), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: MAX_AGE,
-  })
-}
-
-export async function clearSpotifySession(): Promise<void> {
-  const store = await cookies()
-  store.delete(SPOTIFY_COOKIE)
-}

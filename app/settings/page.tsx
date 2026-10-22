@@ -9,15 +9,13 @@ import { QuotaPanel } from '@/components/settings/quota-panel'
 import { SiteFooter } from '@/components/sections/footer'
 
 /**
- * Settings — the operator's view of the budget, the visitor's own API key,
- * the blocklist, the presets and the data controls. Everything here works
- * without a Google account; the only thing that needs one is reading the
- * library, which lives on its own page.
+ * Settings for the search budget, the visitor's own YouTube API key,
+ * the blocklist, presets and data controls.
  */
 
 export const metadata: Metadata = {
   title: 'Settings · needledrop',
-  description: 'Budget, your own API key, blocks, presets and data controls.',
+  description: 'Manage your search budget, YouTube API key, blocks, presets and data.',
   alternates: { canonical: '/settings' },
 }
 
@@ -31,8 +29,9 @@ export default function SettingsPage() {
             <p className="t-small uppercase tracking-widest text-paper/60">Settings</p>
             <h1 className="display t-mega mt-4 leading-[0.9]">The controls.</h1>
             <p className="t-lead mt-6 max-w-[60ch] text-paper/75">
-              The budget, your own API key, the blocklist, saved setups and your data. Everything
-              here works without signing in.
+              Manage search costs, your YouTube API key, the blocklist, saved setups and your data.
+              Search and playlist generation need no sign-in; Google sign-in is only needed when
+              saving a playlist to YouTube Music.
             </p>
           </div>
         </section>
@@ -47,7 +46,7 @@ export default function SettingsPage() {
             </section>
 
             <section>
-              <h2 className="display t-headline leading-none">Your own API key</h2>
+              <h2 className="display t-headline leading-none">Your YouTube API key</h2>
               <div className="mt-6">
                 <ApiKeyPanel />
               </div>

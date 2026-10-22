@@ -4,7 +4,6 @@ import Image from 'next/image'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowRight,
-  KeyRound,
   Loader2,
   Search,
 } from 'lucide-react'
@@ -12,19 +11,16 @@ import {
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Switch } from '@/components/ui/switch'
 import { formatDuration } from '@/lib/format'
 import type { Track } from '@/lib/youtube/types'
 
 /**
  * The seed picker — the first stage of the generator.
  *
- * It owns the search input, the optional BYO-key controls and the result list
- * so the generator component itself only has to react to a chosen track. The
- * picker reports quota spend upward through `onUnitsSpent` rather than owning
- * the running total, because the total belongs to the whole run.
+ * It owns the search input and result list so the generator component itself
+ * only has to react to a chosen track. The picker reports quota spend upward
+ * through `onUnitsSpent` rather than owning the running total.
  */
 export function SeedPicker({
   onSeed,
@@ -39,12 +35,6 @@ export function SeedPicker({
   const [error, setError] = useState<string | null>(null)
   const [demoMode, setDemoMode] = useState(false)
 
-  const [ownKeyOn, setOwnKeyOn] = useState(false)
-  const [ownKey, setOwnKey] = useState('')
-  const [keyConfigured, setKeyConfigured] = useState(false)
-  const [keyBusy, setKeyBusy] = useState(false)
-  const [keyMessage, setKeyMessage] = useState<string | null>(null)
-
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -52,56 +42,6 @@ export function SeedPicker({
       .then((response) => response.json())
       .then((data: { demo: boolean }) => setDemoMode(Boolean(data.demo)))
       .catch(() => undefined)
-  }, [])
-
-  useEffect(() => {
-    fetch('/api/keys')
-      .then((response) => response.json())
-      .then((data: { configured: boolean }) => {
-        setKeyConfigured(Boolean(data.configured))
-        if (data.configured) setOwnKeyOn(true)
-      })
-      .catch(() => undefined)
-  }, [])
-
-  const saveOwnKey = useCallback(async () => {
-    if (!ownKey.trim()) return
-    setKeyBusy(true)
-    setKeyMessage(null)
-    try {
-      const response = await fetch('/api/keys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: ownKey.trim() }),
-      })
-      const payload = (await response.json()) as { message?: string }
-      if (!response.ok) {
-        setKeyMessage(payload.message ?? 'That key could not be saved.')
-        return
-      }
-      setOwnKey('')
-      setKeyConfigured(true)
-      setKeyMessage('Your key is saved. Searches now use your own quota.')
-    } catch {
-      setKeyMessage('The key could not be saved. Try again.')
-    } finally {
-      setKeyBusy(false)
-    }
-  }, [ownKey])
-
-  const removeOwnKey = useCallback(async () => {
-    setKeyBusy(true)
-    setKeyMessage(null)
-    try {
-      await fetch('/api/keys', { method: 'DELETE' })
-      setKeyConfigured(false)
-      setOwnKeyOn(false)
-      setKeyMessage('Your key was removed. The shared quota is used again.')
-    } catch {
-      setKeyMessage('The key could not be removed. Try again.')
-    } finally {
-      setKeyBusy(false)
-    }
   }, [])
 
   useEffect(() => {
@@ -135,8 +75,8 @@ export function SeedPicker({
       }
       if (!response.ok) throw new Error(payload.message ?? 'The search failed.')
       const found = (payload.seeds ?? []) as Track[]
-      setSeeds(found)
       onUnitsSpent(payload.unitsSpent ?? 0)
+      setSeeds(found)
       if (found.length === 0) {
         setError('No tracks matched that search. Try an artist name or a song title.')
       }
@@ -185,58 +125,6 @@ export function SeedPicker({
           Demo catalogue
         </span>
       )}
-
-      <div className="border-t-2 border-paper/15 pt-3">
-        <label className="flex cursor-pointer items-center justify-between gap-4 t-small">
-          <span className="flex items-center gap-2">
-            <KeyRound className="size-4 shrink-0 opacity-70" />
-            Use my own YouTube API key
-          </span>
-          <Switch
-            checked={ownKeyOn}
-            onCheckedChange={(checked) => {
-              setOwnKeyOn(checked)
-              setKeyMessage(null)
-            }}
-            aria-label="Use my own YouTube API key"
-          />
-        </label>
-
-        {ownKeyOn && (
-          <div className="mt-3 flex flex-col gap-2">
-            <p className="t-small text-paper/65">
-              {keyConfigured
-                ? 'A key is saved in this browser. Searches use your own quota, so the shared one lasts longer for everyone else.'
-                : 'Paste a key from your own Google Cloud project. It is stored encrypted in this browser and only ever sent to YouTube.'}
-            </p>
-            {keyConfigured ? (
-              <div className="flex items-center gap-2">
-                <Badge className="text-mint">Key saved</Badge>
-                <Button variant="outline" size="sm" onClick={() => void removeOwnKey()} disabled={keyBusy}>
-                  Remove
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  value={ownKey}
-                  onChange={(event) => setOwnKey(event.target.value)}
-                  placeholder="AIza…"
-                  aria-label="Your YouTube API key"
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="border-paper/40 placeholder:text-paper/65 focus-visible:border-mint"
-                />
-                <Button onClick={() => void saveOwnKey()} disabled={keyBusy || !ownKey.trim()} className="shrink-0">
-                  {keyBusy ? <Loader2 className="size-4 animate-spin" /> : null}
-                  Save key
-                </Button>
-              </div>
-            )}
-            {keyMessage && <p className="t-small text-paper/70">{keyMessage}</p>}
-          </div>
-        )}
-      </div>
 
       {busy && (
         <ul className="flex flex-col" aria-busy="true" aria-label="Searching">

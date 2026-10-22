@@ -14,8 +14,8 @@ import { SiteFooter } from '@/components/sections/footer'
  */
 
 export const metadata: Metadata = {
-  title: 'Library · needledrop',
-  description: 'The playlists on your YouTube account, with the ones made here marked as such.',
+  title: 'YouTube Library · needledrop',
+  description: 'View and manage playlists on your YouTube account, including playlists created with needledrop.',
   alternates: { canonical: '/library' },
 }
 
@@ -42,10 +42,11 @@ export default async function LibraryPage() {
         <section data-chapter="ink" className="bg-ink text-paper">
           <div className="shell pt-[calc(4.5rem_+_6svh)] pb-[6svh]">
             <p className="t-small uppercase tracking-widest text-paper/60">Library</p>
-            <h1 className="display t-mega mt-4 leading-[0.9]">Your playlists.</h1>
+            <h1 className="display t-mega mt-4 leading-[0.9]">Your YouTube playlists.</h1>
             <p className="t-lead mt-6 max-w-[60ch] text-paper/75">
-              Everything on your YouTube account, with the ones made here marked as such. Open one
-              to rename, reorder, trim or delete it.
+              This library manages playlists on your YouTube account, with the ones made here marked
+              as such. Open one to rename, reorder, trim or delete it. Google sign-in is needed only
+              to use this YouTube library.
             </p>
           </div>
         </section>

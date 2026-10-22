@@ -11,7 +11,8 @@ import { SiteFooter } from '@/components/sections/footer'
  */
 
 export const metadata: Metadata = {
-  title: 'Playlist · needledrop',
+  title: 'Edit YouTube Playlist · needledrop',
+  description: 'Edit a playlist on your YouTube account. Sign in with Google to access this YouTube library.',
   alternates: { canonical: '/library' },
 }
 
@@ -28,10 +29,12 @@ export default async function PlaylistPage({
         <section data-chapter="ink" className="bg-ink text-paper">
           <div className="shell pt-[calc(4.5rem_+_6svh)] pb-[6svh]">
             <p className="t-small uppercase tracking-widest text-paper/60">Library</p>
-            <h1 className="display t-mega mt-4 leading-[0.9]">Edit the list.</h1>
+            <h1 className="display t-mega mt-4 leading-[0.9]">Edit your YouTube playlist.</h1>
             <p className="t-lead mt-6 max-w-[60ch] text-paper/75">
-              Rename, reorder, trim. Every change is a real call to YouTube, so the quota cost is
-              shown next to each action.
+              This page edits a playlist on your YouTube account. Sign in with Google to access it
+              here; this sign-in is for YouTube library management, not a requirement for the whole
+              app. Rename, reorder or trim tracks, with the YouTube quota cost shown next to each
+              action.
             </p>
           </div>
         </section>

@@ -183,3 +183,11 @@ turns one seed into twenty tracks, and it has its own arithmetic:
 The last one is the cheapest to fix and the highest value: the signal
 is already computed from `topicCategories`, and the topic *id* it used to
 be keyed on no longer exists.
+
+## 7. Search and saving
+
+The seed picker searches YouTube. Search and playlist generation do not require
+sign-in. Saving a generated playlist to YouTube Music uses Google OAuth and
+creates the playlist on the visitor's YouTube account. Visitors who do not
+sign in can still export/download the generated tracklist using browser-side
+formats.

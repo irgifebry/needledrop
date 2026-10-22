@@ -28,7 +28,7 @@ The difference is not more buttons. It is four things:
 | **Recall** | §22 taste profile · §23 semantic engine | Data flywheel — quality improves with use; a competitor with no history cannot copy it |
 | **Retention** | §24 playlist health · §25 templates & sets · §33 personal dashboard | Switching cost — your library, your profile, your history live here |
 | **Trust** | §26 digests · §31 quota transparency · §34 accuracy corrections | Operational honesty — you always know what the app did and what it cost |
-| **Reach** | §27 interop · §29 public API / CLI / MCP | Distribution — the app becomes a component other people build on |
+| **Reach** | §27 import/export · §29 public API / CLI / MCP | Distribution — the app becomes a component other people build on |
 
 ### 21.3 Updated tier map
 
@@ -476,13 +476,13 @@ playlistItems.list?playlistId=<uploadsId>&maxResults=50      (1 unit)
 
 ---
 
-## 27. Cross-Platform Interop
+## 27. Import and Export Extensions
 
-### 27.1 Taste import from other services (cold-start killer)
+### 27.1 Taste import from user-provided listening-history files (cold-start killer)
 
 Users arrive with years of listening history. Importing it produces an excellent taste profile on day one.
 
-- Accept **pasted or uploaded CSV/JSON** exports: Spotify "Streaming history" / "Playlist" exports, Apple Music play-history exports, Last.fm exports.
+- Accept **pasted or uploaded CSV/JSON** listening-history files with a generic column mapper.
 - **Parsing happens in the browser** by default — the file never touches our server. Only the derived aggregates (artist counts, top tracks) are sent, and only if the user opts in.
 - Aggregates → `tasteProfile` (artists + genres + era) → immediately usable.
 - **Top-20 artist resolution to YouTube** costs ~100 units per artist via `search.list`. Therefore:
@@ -498,13 +498,13 @@ Users arrive with years of listening history. Importing it produces an excellent
 | `.csv` | spreadsheets, further analysis |
 | `.json` | structured, includes scores, reasons, and canonical track keys |
 | `.txt` | copy-paste into Discord / Instagram / notes |
-| **Transfer list** | `title — artist` pairs in the exact format third-party converters expect, plus a step-by-step guide |
+| **Transfer list** | Plain-text `title — artist` pairs for user reference or manual use |
 
-**Compliance note:** we produce *metadata and links only*. We do not extract, host, or transform audio. Users convert through a third-party tool under that tool's own terms.
+**Compliance note:** we produce *metadata and links only*. We do not extract, host, or transform audio. Export files are for user reference and offline handling; needledrop does not connect to music services other than YouTube.
 
 ### 27.3 Deep links
 
-Every track row can jump to: `music.youtube.com/watch?v=…`, `youtube.com/watch?v=…`, a **search link on Spotify / Apple Music** (`spotify:search:artist%20title`), and a **copy-link** action. Search-on-other-platform is a link, not an integration — honest about not being a real API integration.
+Every track row can jump to `music.youtube.com/watch?v=…` or `youtube.com/watch?v=…`, and offers a **copy-link** action.
 
 ### 27.4 Embeddable playlist widget
 
@@ -734,7 +734,7 @@ Units/day by operation · cache-hit rate by endpoint · error rate by operation 
 | **M16** | **Semantic engine v3** | embeddings adapter + cache, co-occurrence graph builder + nightly job, MMR selection, hybrid scoring, breadth/novelty sliders, eval harness & golden seeds | M15 |
 | **M17** | **Playlist health, templates & sets** | health checker, repair flow + diff, scheduled health checks, template library + editor, sets & episodes, episode diff, cover composer | M16 |
 | **M18** | **Autonomous runs** | scheduler, release radar, digests, budget-aware skipping, kill switch | M17 |
-| **M19** | **Distribution surface** | public REST API + project keys + budgets, CLI, MCP server, webhooks, interop export + taste import, embeddable widget | M17 |
+| **M19** | **Distribution surface** | public REST API + project keys + budgets, CLI, MCP server, webhooks, local export + taste import, embeddable widget | M17 |
 | **M20** | **Offline-first & launch scale** | service worker, IndexedDB, Local mode (BYO key in browser), load test, runbook, autoscaling for cache/jobs, final copy & legal pass | M18 + M19 |
 
 Dependency shape: `M15 → M16 → M17 → {M18, M19} → M20`. M18 and M19 can run in parallel.
@@ -778,7 +778,7 @@ needledrop/
 │   ├── templates/{schema.ts,library.ts,apply.ts}
 │   ├── sets/{sets.ts,episodes.ts,diff.ts}
 │   ├── tasks/{scheduler.ts,runs.ts,digest.ts,radar.ts}
-│   ├── interop/{spotify.ts,m3u.ts,deeplinks.ts,widget.ts}
+│   ├── export/{m3u.ts,deeplinks.ts,widget.ts}
 │   ├── cover/{compose.ts,layout.ts}
 │   └── api/{keys.ts,webhooks.ts,ratelimit.ts}
 ├── mcp/server.ts
@@ -826,7 +826,7 @@ needledrop/
 ### 35.5 Decisions needed from you (addendum)
 
 1. **Embedding provider** — a hosted API (Gemini embeddings: best quality, per-token cost, sends metadata to a third party) or a local model (free, private, heavier deploy)? *Recommended: hosted by default with a **local fallback toggle** in settings, and a **metadata-only mode** (topic + graph) for users who refuse to send metadata anywhere.*
-2. **Taste import scope** — ship Spotify-only first, or multi-service from day one? *Recommended: a **generic column-mapper** (the user maps their CSV columns to `artist`/`title`/`playedAt`) — one implementation, every service.*
+2. **Taste import scope** — support a specific listening-history format first, or multiple formats from day one? *Recommended: a **generic column-mapper** (the user maps their CSV columns to `artist`/`title`/`playedAt`) — one implementation, every service.*
 3. **Public API at launch** — open to anyone, or request-access during the beta? *Recommended: request-access + per-key budgets; it protects the shared quota while the pool is small.*
 4. **Collaboration hosting** — is the app the source of truth for pick sessions (needs a store), or should the session be purely client-side (no store)? *Recommended: **client-side first** (works without a DB, matches the stateless philosophy), server-backed only if M11's store is live.*
 5. **Graph corpus ownership** — curate it ourselves, or let users contribute their playlists (opt-in, anonymised)? *Recommended: **operator-curated corpus first**; user contribution in M20 with a documented opt-in and a removal path.*
@@ -881,5 +881,5 @@ needledrop/
 2. `PLAN.md` §17 (M1–M14) — the shipped core.
 3. This addendum §22 → §24 → §25 (taste, quality, maintenance) — **the highest value per unit of work**: they make the existing engine feel personal and trustworthy.
 4. This addendum §23 (semantic engine v3) — the biggest quality jump, but it needs the profile (M15) to be worth it.
-5. This addendum §26–§30 (autonomy, interop, distribution, offline) — scale features; build them once the product loop is retained.
+5. This addendum §26–§30 (autonomy, user-data import/export, distribution, offline) — scale features; build them once the product loop is retained.
 6. This addendum §34 — read this **before** writing `regions.ts`, `live.ts`, and the playlist-creation path. It contains six corrections to the original plan.

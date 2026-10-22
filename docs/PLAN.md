@@ -5,7 +5,7 @@
 **Core feature:** Seed track → discover similar songs → auto-create a YouTube Music playlist
 **Runtime:** Node.js **24 LTS** · npm 11 · full pinned dependency manifest in **§6.1**
 
-> **Companion document.** `PLAN-ADDENDUM.md` specifies the next maturity tier (§21–§35): taste profile, semantic engine v3, playlist health & auto-repair, templates & sets, autonomous runs, cross-platform interop, public API/CLI/MCP, offline-first local mode, product economics, and **API-accuracy corrections** that should be applied before M13. Read §34 first if you are about to write `regions.ts`, `live.ts`, or the playlist-creation path.
+> **Companion document.** `PLAN-ADDENDUM.md` specifies the next maturity tier (§21–§35): taste profile, semantic engine v3, playlist health & auto-repair, templates & sets, autonomous runs, user-provided listening-history import, public API/CLI/MCP, offline-first local mode, product economics, and **API-accuracy corrections** that should be applied before M13. Read §34 first if you are about to write `regions.ts`, `live.ts`, or the playlist-creation path.
 
 ---
 
@@ -600,7 +600,7 @@ M2 is deliberately independent of M3 so the hardest part (the similarity engine)
 
 > **Scope note.** M1–M6 ship the *core loop* (seed → discover → create). The mature feature set — engine v2, full playlist lifecycle, library integration, async jobs, cache + quota governance, UX maturity, platform hardening, public-launch readiness — is specified in **§12–§20** and sequenced as **M7–M14**.
 >
-> **Addendum.** The next maturity tier — taste profile, semantic engine v3, playlist health & auto-repair, templates & sets, autonomous runs, cross-platform interop, public API/CLI/MCP, offline-first local mode, product economics, and **API-accuracy corrections** — is specified in **`PLAN-ADDENDUM.md` §21–§35** and sequenced as **M15–M20**. The addendum is additive: it does not change anything in §1–§20.
+> **Addendum.** The next maturity tier — taste profile, semantic engine v3, playlist health & auto-repair, templates & sets, autonomous runs, user-provided listening-history import, public API/CLI/MCP, offline-first local mode, product economics, and **API-accuracy corrections** — is specified in **`PLAN-ADDENDUM.md` §21–§35** and sequenced as **M15–M20**. The addendum is additive: it does not change anything in §1–§20.
 
 ---
 
@@ -655,7 +655,7 @@ v1 (M1–M6) proves the loop works. The features below turn a **demo** into a **
 | **v2** | Full product | Playlist lifecycle (edit/reorder/delete/duplicate), library page, async jobs, cache, quota ledger, rate limiting, export/share, inline player | infra: Redis + job runner | M9–M12 |
 | **v3** | Platform | Optional persistence, feedback loop, CI/e2e/observability, feature flags, A/B engine, OAuth verification, public launch readiness | ops + compliance | M13–M14 |
 | **v4** | Personal & intelligent | Taste profile, semantic engine v3 (embeddings + artist co-occurrence graph + MMR diversity), playlist health & auto-repair, templates & sets, personal insights | addendum §22–§25, §33 | M15–M17 |
-| **v4.5** | Autonomous & distributed | Scheduled runs, release radar, digests, cross-platform interop, public API/CLI/MCP, offline-first local mode, quota economics | addendum §26–§31 | M18–M20 |
+| **v4.5** | Autonomous & distributed | Scheduled runs, release radar, digests, user-provided history import, public API/CLI/MCP, offline-first local mode, quota economics | addendum §26–§31 | M18–M20 |
 
 ### 12.2 What v1 explicitly cannot do (and why it matters)
 
@@ -998,7 +998,7 @@ Key decisions:
 | **Refine** | "More like these" | Select 3–5 tracks you liked → new centroid → another discovery round (the real iterative loop) |
 | **Refine** | Exclude & re-rank | Remove a track → it is negatively weighted for the rest of the session (learned exclusion) |
 | **Refine** | Compare | Two candidate lists side by side with per-track diff |
-| **Output** | Export | `.m3u` / `.csv` / `.json` / plain text — for moving to Spotify/Apple Music via a third-party converter, and for the "playlist not in YouTube Music" caveat in §9 |
+| **Output** | Export | `.m3u` / `.csv` / `.json` / plain text — a local copy of the generated tracklist, and a fallback for the "playlist not in YouTube Music" caveat in §9 |
 | **Output** | Copy tracklist | One click → formatted plain text for Discord/Instagram/notes |
 | **Share** | Share link | Tracklist compressed into the URL fragment (`#t=...`) → shareable with **zero server storage**; the recipient sees the exact list even without the creator's account |
 | **Share** | Share image | Server-rendered OG image of the playlist (cover strip + title) |
@@ -1274,7 +1274,7 @@ needledrop/
 | **M12** | **UX maturity** | inline player + keyboard shortcuts, "more like these" refinement, energy-arc ordering, export (.m3u/.csv/.json), share link + OG image, PWA, i18n (id/en), theme switch, onboarding tour, per-error empty states, full a11y pass | M9 + M10 |
 | **M13** | **Platform hardening** | Playwright e2e, property-based tests, CI pipeline, preview deploys, structured logging + OTel + Sentry, feature flags + engine A/B, perf budget work, security headers + secret rotation | M11 + M12 |
 | **M14** | **Public launch** | Google OAuth verification (start early), privacy policy + data deletion, ToS-compliance page, load test, quota/BYO-key rollout plan, monitoring + on-call runbook, demo video + landing polish | M13 |
-| **M15–M20** | **Addendum tier** | Taste profile · semantic engine v3 · playlist health & auto-repair · templates & sets · autonomous runs & release radar · interop & public API/CLI/MCP · offline-first local mode | M14 |
+| **M15–M20** | **Addendum tier** | Taste profile · semantic engine v3 · playlist health & auto-repair · templates & sets · autonomous runs & release radar · history import and local export · public API/CLI/MCP · offline-first local mode | M14 |
 
 Dependency shape: M7 → M8 → {M9, M10} → M11 → M12 → M13 → M14. M9 and M10 can run in parallel. The M15–M20 sequence continues `M15 → M16 → M17 → {M18, M19} → M20` and is detailed in **`PLAN-ADDENDUM.md` §35.1**.
 

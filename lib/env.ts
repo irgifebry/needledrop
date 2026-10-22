@@ -29,9 +29,6 @@ const EnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
 
-  /** Optional Spotify integration (search fallback + playlist import/export). */
-  SPOTIFY_CLIENT_ID: z.string().min(1).optional(),
-  SPOTIFY_CLIENT_SECRET: z.string().min(1).optional(),
   /** 32+ chars. Used to derive the AES-256-GCM session key. */
   SESSION_SECRET: z.string().min(32).optional(),
   NEXT_PUBLIC_APP_URL: z.string().default('http://localhost:3000'),
@@ -73,8 +70,6 @@ function rawEnv(): Record<string, string | undefined> {
     YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-    SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
-    SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
     SESSION_SECRET: process.env.SESSION_SECRET,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
@@ -119,11 +114,6 @@ export function hasLiveApi(): boolean {
 export function hasOAuth(): boolean {
   const value = env()
   return Boolean(value.GOOGLE_CLIENT_ID && value.GOOGLE_CLIENT_SECRET)
-}
-
-export function hasSpotify(): boolean {
-  const value = env()
-  return Boolean(value.SPOTIFY_CLIENT_ID && value.SPOTIFY_CLIENT_SECRET)
 }
 
 export function hasDatabase(): boolean {

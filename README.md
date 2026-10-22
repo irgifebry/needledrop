@@ -4,7 +4,8 @@
 
 **Drop the needle on one track. Get the whole session.**
 
-A YouTube Music playlist generator built on the YouTube Data API v3.
+A playlist generator that searches YouTube for a seed, discovers tracks with
+the YouTube Data API v3, and saves generated playlists to YouTube Music.
 Metadata only — nothing is downloaded, ever.
 
 ![status](https://img.shields.io/badge/status-pre--alpha-ff3b47?style=flat-square)
@@ -24,7 +25,8 @@ of the primitives that do exist: related videos, artist catalogues, Wikipedia
 topics, curated playlists, and a co-occurrence graph of artists who keep
 showing up next to each other.
 
-Paste a track. Get a real playlist on your YouTube Music account.
+Search and generate a playlist without signing in. When you are ready to save
+it, connect Google to save the playlist to YouTube Music.
 
 ## How it works
 
@@ -118,12 +120,17 @@ contains no I/O, so the hardest logic is unit-testable without touching the
 network. `lib/youtube/normalize.ts` derives a canonical `artist::title` key so
 the same song uploaded to six channels counts as one track.
 
-**Export needs no account.** The renderers in `lib/export/` are pure and
+**Download/export needs no account.** The renderers in `lib/export/` are pure and
 client-safe, so the browser can render the tracklist itself — no request, no
 quota, and it keeps working when the API is down. The export row sits
 alongside the create button, which is what makes the app usable for a
-visitor who has not signed in: writing a playlist into a YouTube account
-needs one, taking the list with you does not.
+visitor who has not signed in. Saving to YouTube Music requires Google sign-in.
+
+### Search and saving
+
+Search YouTube and generate a playlist without signing in. Sign in with Google
+only when saving the generated playlist to YouTube Music. Without sign-in, you
+can still download the tracklist in one of the browser-generated formats.
 
 ### The backend
 
@@ -221,7 +228,7 @@ Everything is specified before it is built:
   (§6.1) with verified install notes.
 - **[`docs/PLAN-ADDENDUM.md`](docs/PLAN-ADDENDUM.md)** — the mature tier:
   taste profiles, embeddings + co-occurrence graph, playlist health, templates,
-  scheduled runs, interop, public API, offline mode, and **17 API-accuracy
+  scheduled runs, user-provided history import, public API, offline mode, and **17 API-accuracy
   corrections** worth reading before writing a single API call.
 - **[`docs/BACKEND.md`](docs/BACKEND.md)** — how the backend that exists
   actually fits together, and why it is shaped that way.
@@ -269,7 +276,7 @@ Full walkthrough: [`docs/PLAN.md §2`](docs/PLAN.md).
 | `YOUTUBE_API_KEY` | Live discovery instead of the demo catalogue |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Sign-in and real playlist creation |
 | `SESSION_SECRET` | Encrypting the OAuth session cookie (32+ chars) |
-| `NEXT_PUBLIC_APP_URL` | The OAuth redirect origin |
+| `NEXT_PUBLIC_APP_URL` | Google OAuth redirect origin |
 | `UPSTASH_REDIS_REST_URL` / `..._TOKEN` | A shared cache and distributed rate limits |
 | `DATABASE_URL` | Runs history, presets, blocks and feedback |
 | `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | A durable job runner |

@@ -441,8 +441,6 @@ function GeneratorInner() {
     ? plan.estimate.units + plan.playlistEstimate.units
     : discoveryUnits + playlistUnits
 
-  const canCreate = signedIn === true || demoMode
-
   function toggle(videoId: string) {
     setPicked((current) => {
       const next = new Set(current)
@@ -633,6 +631,7 @@ function GeneratorInner() {
             {busy === 'resolve' && (
               <p className="mt-3 t-small text-paper/65">Resolving seed…</p>
             )}
+
           </div>
         )}
 
@@ -1116,61 +1115,55 @@ function GeneratorInner() {
                 />
               </label>
 
-              {canCreate && (
-                <>
-                  <RadioGroup
-                    value={privacy}
-                    onValueChange={(value) => setPrivacy(value as typeof privacy)}
-                    aria-label="Playlist privacy"
-                    className="grid-cols-1 sm:grid-cols-3"
-                  >
-                    <RadioCard value="private">
-                      <Lock className="size-4 shrink-0" />
-                      <span className="t-small font-semibold">Private</span>
-                    </RadioCard>
-                    <RadioCard value="unlisted">
-                      <span className="t-small font-semibold">Unlisted</span>
-                    </RadioCard>
-                    <RadioCard value="public">
-                      <span className="t-small font-semibold">Public</span>
-                    </RadioCard>
-                  </RadioGroup>
+              <RadioGroup
+                value={privacy}
+                onValueChange={(value) => setPrivacy(value as typeof privacy)}
+                aria-label="YouTube Music playlist privacy"
+                className="grid-cols-1 sm:grid-cols-3"
+              >
+                <RadioCard value="private">
+                  <Lock className="size-4 shrink-0" />
+                  <span className="t-small font-semibold">Private</span>
+                </RadioCard>
+                <RadioCard value="unlisted">
+                  <span className="t-small font-semibold">Unlisted</span>
+                </RadioCard>
+                <RadioCard value="public">
+                  <span className="t-small font-semibold">Public</span>
+                </RadioCard>
+              </RadioGroup>
 
-                  <div className="flex items-baseline justify-between t-small">
-                    <span className="text-paper/65">This run will cost</span>
-                    <span className="tnum font-semibold">
-                      {formatUnits(playlistUnits + discoveryUnits)} of {formatUnits(DAILY_QUOTA)}
-                    </span>
-                  </div>
-                </>
-              )}
+              <div className="flex items-baseline justify-between t-small">
+                <span className="text-paper/65">This run will cost</span>
+                <span className="tnum font-semibold">
+                  {formatUnits(playlistUnits + discoveryUnits)} of {formatUnits(DAILY_QUOTA)}
+                </span>
+              </div>
 
-              {signedIn === false && !demoMode && (
-                <div className="flex flex-col gap-2 border-2 border-paper/20 p-3">
-                  <p className="t-small text-paper/75">
-                    Writing the playlist into your own YouTube account needs a Google sign-in. You
-                    can still take the list with you — every format below carries the whole
-                    tracklist.
-                  </p>
-                  <ButtonLink href="/api/auth/google" variant="outline" size="sm" className="self-start">
-                    Sign in with Google
-                  </ButtonLink>
-                </div>
-              )}
+              <p className="t-small text-paper/65">
+                Browse, search, and build your playlist without signing in. Google sign-in is only
+                needed to save to YouTube Music.
+              </p>
 
               {error && <p className="t-small text-orange">{error}</p>}
 
               <div className="flex flex-col gap-2 sm:flex-row">
-                {canCreate && (
-                  <Button
-                    onClick={() => void runCreate()}
-                    disabled={busy === 'create' || job.isRunning}
-                    block
-                  >
-                    {busy === 'create' || job.isRunning ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-                    Create playlist
-                  </Button>
-                )}
+                <Button
+                  onClick={() => {
+                    if (!demoMode && signedIn !== true) {
+                      // OAuth must complete a full browser round-trip; don't use client routing.
+                      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                      window.location.href = '/api/auth/google'
+                      return
+                    }
+                    void runCreate()
+                  }}
+                  disabled={busy === 'create' || job.isRunning}
+                  block
+                >
+                  {busy === 'create' || job.isRunning ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
+                  Save to YouTube Music
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => void runDiscover()}

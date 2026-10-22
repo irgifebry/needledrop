@@ -37,25 +37,26 @@ export function isMusicVideo(track: Track): boolean {
   const title = track.title.toLowerCase()
   const channel = track.channelTitle.toLowerCase()
 
-  // A VEVO channel hosts music videos, unless the title says it is an audio
-  // upload (no "video" marker and an "audio" marker).
-  if (channel.includes('vevo')) {
-    const hasVideoMarker = /\bvideo\b/.test(title) || /\bmv\b/.test(title)
-    const hasAudioMarker = /\baudio\b/.test(title)
-    if (hasVideoMarker || !hasAudioMarker) return true
-  }
+  // Explicit audio labeling wins over channel branding (including VEVO):
+  // official audio uploads and auto-generated Topic tracks are recordings.
+  const hasAudioMarker = /\baudio\b/.test(title)
+  if (hasAudioMarker) return false
 
-  // Title-based markers.
-  if (/\bvideo\b/.test(title)) return true
-  if (/\bmv\b/.test(title)) return true
-  if (/\bm\/v\b/.test(title)) return true
+  // Channel branding can identify a music-video upload even when its title
+  // omits the word "video". Avoid broad "official" matching: official audio
+  // channels are still valid recording sources.
+  if (/\bvevo\b|\bmusic\s+videos?\b|\blyric\s+videos?\b/.test(channel)) return true
+
+  // Titles use several equivalent spellings, including bare "lyrics".
+  if (/\b(?:music\s+video|lyric\s+video|lyrics?|video|m\s*\/\s*v|mv)\b/.test(title)) {
+    return true
+  }
 
   const tags = extractVersionTags(track.title, track.channelTitle)
   if (tags.includes('video')) return true
 
   const tagText = (track.tags ?? []).join(' ').toLowerCase()
-  if (/\bvideo\b/.test(tagText)) return true
-  if (/\bmv\b/.test(tagText)) return true
+  if (/\b(?:lyrics?|video|m\s*\/\s*v|mv)\b/.test(tagText)) return true
 
   return false
 }

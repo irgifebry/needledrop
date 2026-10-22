@@ -118,10 +118,10 @@ export function ApiKeyPanel() {
   return (
     <div className="space-y-6">
       <p className="t-body text-ink/75">
-        The shared project key pays for every search, and the project&apos;s daily budget is a hundred
-        searches. A key from your own Google Cloud project moves your traffic onto your own quota.
-        The app does not spread its own load over several projects to multiply the quota — that is
-        quota circumvention, and it is not a feature.
+        NeedleDrop searches YouTube tracks and builds playlists without sign-in. For
+        live YouTube search, the shared project key uses the project&apos;s daily quota. You can
+        optionally add a YouTube Data API key from your own Google Cloud project here in Settings
+        to use your own quota. This key is for searching, not for signing in or saving a playlist.
       </p>
 
       <div className="border-2 border-ink/20 bg-paper p-5">
@@ -150,8 +150,8 @@ export function ApiKeyPanel() {
             onChange={(event) => setValue(event.target.value)}
           />
           <p className="t-small text-ink/60">
-            Saving costs 1 quota unit — the verification probe. The key is checked against YouTube
-            before it is stored.
+            Add your key here in Settings; it is checked with YouTube before it is stored. Verification
+            costs 1 quota unit. The key is used for YouTube searches only; playlist saving uses Google sign-in.
           </p>
           <Button
             variant="mint"
