@@ -38,6 +38,10 @@ const LINK_COLUMNS = [
     links: [
       { label: 'Source code', href: 'https://github.com/irgifebry/needledrop' },
       {
+        label: 'Privacy policy',
+        href: '/privacy',
+      },
+      {
         label: 'MIT licence',
         href: 'https://github.com/irgifebry/needledrop/blob/main/LICENSE',
       },

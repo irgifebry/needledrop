@@ -33,6 +33,11 @@ const QUESTIONS = [
     answer:
       'Some recordings exist on YouTube but are not licensed into YouTube Music, and the public API cannot verify that. We disclose it rather than pretend, and you can remove any row before creating.',
   },
+  {
+    question: 'What happens to my Google data?',
+    answer:
+      'needledrop’s use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements. We read YouTube metadata to build your playlist, keep your token in an encrypted cookie, and delete everything on request. No audio, no selling, no model training. The full policy is on the privacy page.',
+  },
 ]
 
 export function Faq() {
