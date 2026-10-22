@@ -1,0 +1,18 @@
+{
+  "//": "The test suite is typechecked separately from the app. `next build` must not fail because a test file has a type error — the test suite has its own gate (`npm run typecheck`).",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": ".next/tsconfig.test.tsbuildinfo"
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next"
+  ]
+}
