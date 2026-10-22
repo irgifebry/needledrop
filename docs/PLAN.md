@@ -52,7 +52,7 @@
 ```
 
 ### Key insight
-**Discovery does not require auth.** `search.list`, `videos.list`, and `playlistItems.list` work on public data. Only *creating* a playlist needs the `youtube.playlists` scope. This means the discovery algorithm can be developed and tested before OAuth is even wired up — and if the user is not signed in, the app still works as a "finder" and prompts them to sign in only at the final "Create playlist" step.
+**Discovery does not require auth.** `search.list`, `videos.list`, and `playlistItems.list` work on public data. Only *creating* a playlist needs the `youtube.force-ssl` scope. This means the discovery algorithm can be developed and tested before OAuth is even wired up — and if the user is not signed in, the app still works as a "finder" and prompts them to sign in only at the final "Create playlist" step.
 
 ---
 
@@ -77,11 +77,27 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ### Scopes
 | Scope | Purpose |
 |---|---|
-| `https://www.googleapis.com/auth/youtube.playlists` | create playlists, add items |
+| `https://www.googleapis.com/auth/youtube.force-ssl` | create playlists, add items |
 | `https://www.googleapis.com/auth/youtube.readonly` | read library/playlists |
 | `https://www.googleapis.com/auth/userinfo.email` | show signed-in identity |
+| `https://www.googleapis.com/auth/userinfo.profile` | show signed-in name |
 
-`youtube.force-ssl` is deliberately **not** requested — it would grant write access to every video on the account.
+> **There is no `youtube.playlists` scope.** The Data API publishes exactly
+> seven YouTube scopes and that is not one of them; a request naming it
+> comes back as `Error 400: invalid_scope` and the *entire* sign-in fails,
+> not just the playlist feature. The write side of the playlist API is
+> covered by `youtube.force-ssl`, which is `youtube` with the SSL
+> requirement made explicit and is what Google recommends for new
+> integrations. `tests/contract/oauth-scopes.test.ts` pins the list against
+> the published scopes so this cannot regress.
+
+`youtube.force-ssl` is a **sensitive** scope: Google requires verification
+before a public app can use it in production, and it grants write access
+across the account, not just to playlists. There is no narrower scope for
+playlist writes — `youtube.readonly` cannot create anything — so the
+trade-off is inherent, not a choice. Two things keep it honest: the scope
+is only requested when the user explicitly signs in, and the consent screen
+names it plainly so the grant is informed.
 
 ### 2.1 Local prerequisites
 
@@ -1036,8 +1052,8 @@ Lets engine v2 ship dark, compare output against v1 on real seeds, then flip.
 | Area | Requirement |
 |---|---|
 | **YouTube API Terms** | Comply with the YouTube API Services Terms & Developer Policies: required attribution/branding, no bulk downloading, no separating/remixing audio into files, no permanent caching of restricted content |
-| **Scope minimisation** | Only `youtube.playlists` + `youtube.readonly` + `userinfo.email`; never `youtube.force-ssl`; `youtube.readonly` only requested when the user opts into library features |
-| **OAuth verification** | Public launch requires Google OAuth verification + scope justification for `youtube.playlists` — start this early (it takes days–weeks) |
+| **Scope minimisation** | Only `youtube.force-ssl` + `youtube.readonly` + `userinfo.email` + `userinfo.profile`; the write scope is requested only when the user explicitly signs in, and there is no narrower scope for playlist writes |
+| **OAuth verification** | Public launch requires Google OAuth verification + scope justification for `youtube.force-ssl` (a sensitive scope) — start this early (it takes days–weeks) |
 | **Privacy** | Privacy policy page; "delete all my data" endpoint; token revocation on logout; watch-history access is opt-in, scoped, and revocable; no third-party analytics on unauthenticated pages without consent |
 | **Copyright** | Metadata + links only; no lyrics, no downloads, no ripping; skip `embeddable=false`; respect `license` field and display CC attribution where applicable |
 | **Safety** | "Family mode" skips `madeForKids` content; an optional "no explicit" heuristic filter (title/keyword based — imperfect, disclosed as such) |
@@ -1273,7 +1289,7 @@ Dependency shape: M7 → M8 → {M9, M10} → M11 → M12 → M13 → M14. M9 an
 | Same song uploaded by many channels floods the list | Playlist feels broken | Canonical `trackKey` dedupe across channels (§13.1.1) |
 | `relatedToVideoId` returns non-music or off-topic results | Poor recommendations | Category filter + topic scoring + explainable reasons + manual curation |
 | Tracks unavailable in the user's region | Playlist items won't play | `availableCountries` flag, region-safe mode, UI disclosure (§13.1.7, §9) |
-| OAuth verification rejected for `youtube.playlists` | Cannot create playlists in production | Start verification at M1, keep discovery-only mode functional, BYO key fallback, document the "export only" mode |
+| OAuth verification rejected for `youtube.force-ssl` | Cannot create playlists in production | Start verification at M1, keep discovery-only mode functional, BYO key fallback, document the "export only" mode |
 | API quota policy changes | Discovery breaks | Thin `client.ts` boundary, feature flags, cached-only degradation, contract tests that fail loudly |
 | Explicit / NSFW content leaks into playlists | Reputation & policy risk | Family mode, keyword heuristics (disclosed as imperfect), blocklist, per-item removal in the editor |
 | Storing refresh tokens in a cookie | Account compromise on XSS | AES-256-GCM + `httpOnly` + `Secure` + `SameSite=Lax`, 4 KB payload limit, never logged, revoked on logout, CSP headers |
