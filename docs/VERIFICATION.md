@@ -318,35 +318,125 @@ Note the 24-hour wait Google mentions: after the property is verified, the
 branding review has to be retried, and Google needs up to a day for its own
 systems to pick the change up.
 
-### 4.3 What is *not* required
+### 4.3 The scope classification was never actually tested
 
 The Verification Center reports:
 
 > *"Verification is not required since your app is not requesting any
 > sensitive or restricted scopes."*
 
-So `youtube.force-ssl` is classified **non-sensitive** by Google, and this
-app does not need:
+That was true for a reason that had nothing to do with the classification
+of `youtube.force-ssl`: **no scopes were declared at all.** The Data access
+summary on the Prepare-for-verification page renders *"No rows to display"*.
+An empty declaration is trivially free of sensitive scopes.
 
-- a sensitive scope verification,
-- a scope justification,
-- a demo video.
+So the classification of `youtube.force-ssl` is still unknown. Declare the
+scopes (section 5.1) and re-read the status; if it changes, the scope
+justification in section 1 and the demo video in section 2 come back into
+play. Until then they are held, not required.
 
-The `youtube.force-ssl` scope itself is still correct — the Data API
-publishes seven scopes and it is the narrowest one that authorises
-`playlists.insert`. The verification requirement was about the *app* being
-public, not about the scope.
-
-The scope justification in section 1 and the shot list in section 2 are kept
-in this file because the classification is Google's to change, and a
-reclassification would need both again. Until then they are held, not
-required.
+The scope choice itself is not in question — the Data API publishes seven
+scopes and `youtube.force-ssl` is the narrowest one that authorises
+`playlists.insert`.
 
 ### 4.4 Order of operations
 
 1. Branding published, logo replaced — done
 2. Publishing status set to **In production** — done
-3. Domain ownership verified via Search Console — **in progress**
-4. **Verify branding** → wait for "Ready to publish" → **Publish branding**
-5. Sign-in works, and the consent screen shows the app name and logo
+3. **Scopes declared on the Data Access page** — see section 5.1
+4. Domain ownership: Search Console property verified, then appeal
+5. **Publish branding** → sign-in shows the app name and logo
+
+---
+
+## 5. What to fill in the "Prepare for verification" form
+
+### 5.1 Data access summary — declare the scopes first
+
+The summary table renders **"No rows to display"** until the scopes are
+declared on the Data Access page. That is not cosmetic. Google's policy:
+
+> *"Your project configuration in the Google Cloud Console Consent Screen
+> page must match the list of scopes requested by your app."*
+
+The code requests four scopes, so the consent screen must declare those
+four. Go to **Data Access → Add or remove scopes** and add all of them, each
+with a user-facing description — these strings are what a user reads on the
+consent screen, so they are written for them, not for a reviewer:
+
+| Scope | User-facing description |
+|---|---|
+| `youtube.force-ssl` | Create and edit playlists in your YouTube account |
+| `youtube.readonly` | See the playlists and videos in your YouTube library |
+| `userinfo.email` | Know your email address so the site can show which account is signed in |
+| `userinfo.profile` | Know your display name so the site can show which account is signed in |
+
+Adding them also settles the question in section 4.3. Re-read the
+Verification Center's data access status afterwards: if `youtube.force-ssl`
+turns out to be sensitive, the scope justification in section 1 and the demo
+video in section 2 come back into play.
+
+### 5.2 Appeal reasons
+
+**Reason for appeal** — pick the option that says the finding is incorrect,
+or "Other" if there is nothing closer.
+
+**Explanation** (1000 characters) — the argument, in the order a reviewer
+needs it: the structural fact, then the proof of control, then what the app
+is.
+
+> The home page domain `needdrop.vercel.app` is a subdomain of `vercel.app`,
+> which is listed in the Public Suffix List, so the registrable domain is
+> the subdomain itself. It has no registry: an RDAP lookup of
+> `needdrop.vercel.app` returns "Domain name does not have a registry".
+> `vercel.app` is registered to Vercel, Inc. with Vercel's nameservers, so
+> no developer can become its registrant and a registration record naming
+> this developer cannot exist.
+>
+> Control of the site is verifiable and has been verified. The Search
+> Console property `https://needdrop.vercel.app/` is owned by the Google
+> account behind this project, and the site serves Google's own
+> verification file at
+> `https://needdrop.vercel.app/googlebc148e7504272ad6.html`.
+>
+> The application is a YouTube playlist generator at
+> `https://needdrop.vercel.app`, with its privacy policy at
+> `https://needdrop.vercel.app/privacy` and its source public at
+> `https://github.com/irgifebry/needledrop`. OAuth client id
+> `247187332561-sraf9nfajnbe4jubboqkc1dlfo75spml.apps.googleusercontent.com`.
+>
+> The app is not for personal use. It is a public product with a shared API
+> quota, published for anyone with a Google account.
+
+**Additional info** (1000 characters) — what the reviewer cannot infer.
+
+> Google Cloud project: `plucky-agent-464115-b1`. OAuth client:
+> `247187332561-sraf9nfajnbe4jubboqkc1dlfo75spml.apps.googleusercontent.com`.
+> The YouTube Data API v3 key is issued in the same project and is shared
+> across the deployment, so the API quota is shared with the project
+> itself rather than with any other product.
+>
+> The app reads public YouTube metadata through that key and never touches
+> a signed-in account; the OAuth scopes are requested only when a user
+> chooses to sign in, which is when they want a playlist written to their
+> own account. The API key can be supplied by a developer for their own
+> use; the shared one is not a secret and is not user data.
+>
+> The application stores the access token, refresh token, email address and
+> display name in a single AES-256-GCM encrypted, httpOnly, Secure cookie,
+> never in a log. Signing out revokes the refresh token on Google's side
+> first. A "delete all my data" control is published at
+> `https://needdrop.vercel.app/privacy`, and the endpoint behind it is
+> `DELETE /api/feedback`.
+>
+> There is no separate production project: this project serves both the
+> public deployment and local development, and local development uses
+> `http://localhost:3000` as its redirect origin.
+
+### 5.3 One thing still worth checking in the dashboard
+
+Before confirming, check Vercel → Project `needledrop` → Settings →
+Domains. If there is a DNS or Records section for the project domain, a TXT
+record can be published there and the automated check passes without an
+appeal. The API says no; the dashboard is a different surface.
 
