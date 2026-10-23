@@ -25,7 +25,7 @@ export default function SettingsPage() {
       <ScrollToTop />
       <main className="bg-paper text-ink">
         <section data-chapter="ink" className="bg-ink text-paper">
-          <div className="shell py-[6svh]">
+          <div className="shell page-hero-content">
             <p className="t-small uppercase tracking-widest text-paper/60">Settings</p>
             <h1 className="display t-mega mt-4 leading-[0.9]">The controls.</h1>
             <p className="t-lead mt-6 max-w-[60ch] text-paper/75">
