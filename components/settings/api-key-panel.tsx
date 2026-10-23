@@ -27,40 +27,31 @@ export function ApiKeyPanel() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+
+  function retryLoad() {
+    setLoading(true)
+    setError(null)
+    setLoadAttempt((attempt) => attempt + 1)
+  }
 
   useEffect(() => {
-    let cancelled = false
-    fetch('/api/keys')
-      .then((response) =>
-        response
-          .json()
-          .catch(() => null)
-          .then((payload) => ({ response, payload })),
-      )
-      .then(({ response, payload }) => {
-        if (cancelled) return
-        if (!response.ok) {
-          setError(
-            (payload && typeof payload.message === 'string' && payload.message) ||
-              'The key status could not be loaded.',
-          )
-          return
-        }
-        setConfigured(Boolean(payload?.configured))
-      })
-      .catch(() => {
-        if (cancelled) return
-        setError('The key status could not be loaded. Check your connection and try again.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    let active = true
+    const result = fetch('/api/keys')
+      .then(async (response) => ({ response, payload: await response.json().catch(() => null) }))
+      .catch(() => null)
+    void result.then((loaded) => {
+      if (!active) return
+      if (!loaded) setError('The key status could not be loaded. Check your connection and try again.')
+      else if (!loaded.response.ok) setError(loaded.payload?.message || 'The key status could not be loaded.')
+      else setConfigured(Boolean(loaded.payload?.configured))
+      setLoading(false)
+    })
+    return () => { active = false }
+  }, [loadAttempt])
 
   async function save() {
+    if (busy) return
     setBusy(true)
     setMessage(null)
     try {
@@ -88,6 +79,7 @@ export function ApiKeyPanel() {
   }
 
   async function remove() {
+    if (busy) return
     setBusy(true)
     setMessage(null)
     try {
@@ -112,7 +104,7 @@ export function ApiKeyPanel() {
   }
 
   if (error) {
-    return <EmptyState title="The key status could not be loaded." body={error} />
+    return <div className="space-y-3"><EmptyState title="The key status could not be loaded." body={error} /><Button variant="outline" size="md" onClick={retryLoad}>Retry</Button></div>
   }
 
   return (
