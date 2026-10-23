@@ -4,6 +4,7 @@ import { DataControls } from '@/components/privacy/data-controls'
 import { ScrollToTop } from '@/components/scroll-to-top'
 import { SiteFooter } from '@/components/sections/footer'
 import { Toaster } from '@/components/toaster'
+import { readSession } from '@/lib/session'
 
 /**
  * The privacy policy.
@@ -110,13 +111,14 @@ const SECTIONS: Array<{ heading: string; body: string[]; list?: string[] }> = [
   },
 ]
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const session = await readSession()
   return (
     <>
       <ScrollToTop />
       <main className="bg-paper text-ink">
         <section className="bg-ink text-paper">
-          <div className="shell py-[6svh]">
+          <div className="shell page-hero-content">
             <p className="t-small uppercase tracking-widest text-paper/60">Legal</p>
             <h1 className="display t-mega mt-4 leading-[0.9]">Privacy</h1>
             <p className="t-lead mt-6 max-w-[60ch] text-paper/75">
@@ -154,15 +156,15 @@ export default function PrivacyPage() {
               <h2 className="t-title font-semibold">Delete everything</h2>
               <p className="t-body mt-4 leading-relaxed text-ink/80">
                 Sign out revokes your Google token when possible and clears your Google session
-                cookie; it does not clear your saved YouTube API key.
-                Delete all my data erases rows stored under your anonymous identifier — presets,
-                blocks, feedback and run history — and rotates that identifier so the old cookie
-                cannot reach anything. It does not delete playlists already saved to Google or
-                Google, or clear your Google sign-in session or saved API key. Deletion cannot be
-                undone.
+                cookie; it does not clear your saved YouTube API key. Delete my anonymous data
+                deletes rows for the anonymous identifier from the store reported after the request
+                (Postgres or the in-memory store) and rotates that identifier. If the database is
+                unavailable and the request falls back to memory, this does not delete rows in that
+                unavailable database. Deletion does not affect playlists already saved to YouTube,
+                your Google sign-in session, or your saved API key. Deletion cannot be undone.
               </p>
               <div className="mt-6">
-                <DataControls />
+                <DataControls signedIn={Boolean(session)} />
               </div>
             </section>
 
