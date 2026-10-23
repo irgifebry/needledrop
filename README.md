@@ -288,4 +288,4 @@ implementation and says so in the response.
 
 MIT © irgifebry
 
-Photographs are from Wikimedia Commons and are credited in the page footer.
+Album cover art (Daniel Caesar, Frank Ocean, Tyler, The Creator, SZA, Brent Faiyaz, Kehlani, GIVĒON) via Apple Music / iTunes, credited in the page footer.
