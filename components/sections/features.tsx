@@ -18,7 +18,7 @@ const FEATURES: Feature[] = [
     field: 'mint',
     ink: 'ink',
     phrase: 'Cost before commit',
-    body: 'A 20-track playlist costs roughly 1,450 of the 10,000 daily units. The estimate sits on screen before anything is written.',
+    body: 'Discovery estimates vary with the searches and results needed. Playlist writing adds 50 units to create it, plus 50 per track inserted; the app shows an estimate before you commit.',
     rows: [
       { label: '4 search calls', value: '400' },
       { label: '2 hydration calls', value: '2' },
