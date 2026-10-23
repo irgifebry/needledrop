@@ -29,7 +29,7 @@
 import { z } from 'zod'
 
 import corpusJson from '@/corpus/playlists.json'
-import { cachedFetch, setCached } from '@/lib/cache'
+import { cachedFetch, getCached, setCached } from '@/lib/cache'
 import { CACHE_TTL, namespacedKey } from '@/lib/cache/keys'
 import { UNIT_COST } from '@/lib/quota'
 import { assertWithinBudget, budgetStatus } from '@/lib/quota-ledger'
@@ -212,10 +212,18 @@ export async function discover(
   context: DiscoverContext = {},
 ): Promise<Candidate[]> {
   if (!canReachLiveApi(context.apiKeyOverride)) {
-    const demo = discoverDemo(seed, options, context)
-    await cacheCandidates(seed, options, demo)
-    return demo
+    // Demo results are never cached: they are synthesised from the bundled
+    // catalogue and must not be served to a later live run under the same
+    // seed/options key (that would poison the live cache with demo tracks).
+    return discoverDemo(seed, options, context)
   }
+
+  // A complete result may already be cached from an earlier run of the same
+  // seed and options. Serving it costs no upstream call and no API key, so
+  // it must short-circuit before any budget check or source collection.
+  const cacheKey = discoveryCacheKey(seed, options)
+  const cached = await getCached<Candidate[]>(cacheKey)
+  if (cached) return cached
 
   const sessionId = context.sessionId ?? 'anonymous'
   // The shared budget caps what the deployment spends on everybody's
