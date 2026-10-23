@@ -1,4 +1,5 @@
-import { cachedFetch } from '@/lib/cache'
+import { cachedFetch, getCached, setCached } from '@/lib/cache'
+import { CACHE_TTL, namespacedKey } from '@/lib/cache/keys'
 
 import { DEMO_TRACKS } from './demo'
 import { parseChannelName } from './artist'
@@ -240,6 +241,13 @@ export async function searchSeeds(
 
   if (!canReachLiveApi(init.apiKeyOverride)) return demoSearch(trimmed)
 
+  // Cache the fully filtered/ranked result so a repeated identical query
+  // costs no upstream call and no API key — only its constituent calls were
+  // cached before, which still re-ran hydration/filter/ranking every time.
+  const resultKey = namespacedKey('searchResult', { q: trimmed.toLowerCase() })
+  const cached = await getCached<Track[]>(resultKey)
+  if (cached) return cached
+
   const search = await cachedFetch<SearchResponse>(
     'search.list',
     {
@@ -263,7 +271,10 @@ export async function searchSeeds(
   const ids = (search.items ?? [])
     .map((item) => item.id?.videoId)
     .filter((id): id is string => Boolean(id))
-  if (ids.length === 0) return []
+  if (ids.length === 0) {
+    await setCached(resultKey, [], CACHE_TTL.search)
+    return []
+  }
 
   // The server-side filter cannot tell a recording from a radio segment,
   // and the sources that feed discovery have no server-side filter at all,
@@ -271,7 +282,9 @@ export async function searchSeeds(
   // the query has to survive the filter before it can be ranked, and the
   // ranking is what puts the artist's own recordings on top of a page of
   // unrelated uploads.
-  return rankByRelevance(filterTracks(await videosByIds(ids, meter, init)), trimmed)
+  const result = rankByRelevance(filterOfficialTracks(filterTracks(await videosByIds(ids, meter, init))), trimmed)
+  await setCached(resultKey, result, CACHE_TTL.search)
+  return result
 }
 
 /**
@@ -289,6 +302,10 @@ export async function searchByChannelId(
   if (!trimmed) return []
   if (!canReachLiveApi(init.apiKeyOverride)) return demoTracksByChannelId(trimmed)
 
+  const resultKey = namespacedKey('channelTracks', { channelId: trimmed })
+  const cached = await getCached<Track[]>(resultKey)
+  if (cached) return cached
+
   const search = await cachedFetch<SearchResponse>(
     'search.list',
     {
@@ -305,9 +322,14 @@ export async function searchByChannelId(
   const ids = (search.items ?? [])
     .map((item) => item.id?.videoId)
     .filter((id): id is string => Boolean(id))
-  if (ids.length === 0) return []
+  if (ids.length === 0) {
+    await setCached(resultKey, [], CACHE_TTL.search)
+    return []
+  }
 
-  return filterTracks(await videosByIds(ids, meter, init))
+  const result = filterOfficialTracks(filterTracks(await videosByIds(ids, meter, init)))
+  await setCached(resultKey, result, CACHE_TTL.search)
+  return result
 }
 
 /**
@@ -325,6 +347,10 @@ export async function resolveChannel(
   if (!trimmed) return null
   if (!canReachLiveApi(init.apiKeyOverride)) return demoResolveChannel(trimmed)
 
+  const resultKey = namespacedKey('resolvedChannel', { q: trimmed.toLowerCase() })
+  const cached = await getCached<ResolvedChannel>(resultKey)
+  if (cached) return cached
+
   const search = await cachedFetch<SearchResponse>(
     'search.list',
     {
@@ -340,15 +366,20 @@ export async function resolveChannel(
   const channels = (search.items ?? [])
     .map((item) => ({ id: item.id?.channelId ?? '', title: item.snippet?.title ?? '' }))
     .filter((channel) => channel.id && channel.title)
-  if (channels.length === 0) return null
+  if (channels.length === 0) {
+    await setCached(resultKey, null, CACHE_TTL.channel)
+    return null
+  }
 
   const topic = channels.find((channel) => parseChannelName(channel.title).kind === 'topic')
   const chosen = topic ?? channels[0]
-  return {
+  const result = {
     id: chosen.id,
     title: chosen.title,
     kind: parseChannelName(chosen.title).kind === 'topic' ? 'topic' : 'channel',
-  }
+  } as ResolvedChannel
+  await setCached(resultKey, result, CACHE_TTL.channel)
+  return result
 }
 
 /**
@@ -366,6 +397,10 @@ export async function channelById(
   if (!trimmed) return null
   if (!canReachLiveApi(init.apiKeyOverride)) return demoChannelById(trimmed)
 
+  const resultKey = namespacedKey('channelById', { id: trimmed })
+  const cached = await getCached<ResolvedChannel>(resultKey)
+  if (cached) return cached
+
   const response = await cachedFetch<ChannelListResponse>(
     'channels.list',
     { part: 'snippet', id: trimmed, maxResults: 1 },
@@ -374,17 +409,19 @@ export async function channelById(
   )
   const title = response.items?.[0]?.snippet?.title
   if (!title) return null
-  return {
+  const result = {
     id: trimmed,
     title,
     kind: parseChannelName(title).kind === 'topic' ? 'topic' : 'channel',
-  }
+  } as ResolvedChannel
+  await setCached(resultKey, result, CACHE_TTL.channel)
+  return result
 }
 
 /** Search the built-in catalogue — the demo stand-in for `search.list`. */
 export function demoSearch(query: string): Track[] {
   const needle = query.toLowerCase().trim()
-  const scored = DEMO_TRACKS.map((track) => {
+  const scored = filterOfficialTracks(DEMO_TRACKS).map((track) => {
     const haystack = `${track.title} ${track.artist} ${track.channelTitle}`.toLowerCase()
     if (!haystack.includes(needle)) return null
     const titleHit = track.title.toLowerCase().includes(needle) ? 2 : 0
@@ -420,7 +457,17 @@ function demoTracksByIds(ids: string[]): Track[] {
 }
 
 function demoTracksByChannelId(channelId: string): Track[] {
-  return DEMO_TRACKS.filter((track) => demoChannelId(track.channelTitle) === channelId)
+  return filterOfficialTracks(
+    DEMO_TRACKS.filter((track) => demoChannelId(track.channelTitle) === channelId),
+  )
+}
+
+/** Only accept YouTube's Topic channels and VEVO artist channels as sources. */
+function filterOfficialTracks(tracks: Track[]): Track[] {
+  return tracks.filter((track) => {
+    const kind = parseChannelName(track.channelTitle).kind
+    return kind === 'topic' || kind === 'vevo'
+  })
 }
 
 function demoChannelById(channelId: string): ResolvedChannel | null {
