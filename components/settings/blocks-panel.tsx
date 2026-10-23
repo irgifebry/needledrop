@@ -36,40 +36,32 @@ export function BlocksPanel() {
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+
+  function retryLoad() {
+    setLoading(true)
+    setError(null)
+    setLoadAttempt((attempt) => attempt + 1)
+  }
 
   useEffect(() => {
-    let cancelled = false
-    fetch('/api/blocks')
-      .then((response) =>
-        response
-          .json()
-          .catch(() => null)
-          .then((payload) => ({ response, payload })),
-      )
-      .then(({ response, payload }) => {
-        if (cancelled) return
-        if (!response.ok) {
-          setError((payload && typeof payload.message === 'string' && payload.message) || 'The blocklist could not be loaded.')
-          return
-        }
-        setBlocks(payload?.blocks ?? [])
-        setStore(payload?.store ?? 'memory')
-      })
-      .catch(() => {
-        if (cancelled) return
-        setError('The blocklist could not be loaded. Check your connection and try again.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    let active = true
+    const result = fetch('/api/blocks')
+      .then(async (response) => ({ response, payload: await response.json().catch(() => null) }))
+      .catch(() => null)
+    void result.then((loaded) => {
+      if (!active) return
+      if (!loaded) setError('The blocklist could not be loaded. Check your connection and try again.')
+      else if (!loaded.response.ok) setError(loaded.payload?.message || 'The blocklist could not be loaded.')
+      else { setBlocks(loaded.payload?.blocks ?? []); setStore(loaded.payload?.store ?? 'memory') }
+      setLoading(false)
+    })
+    return () => { active = false }
+  }, [loadAttempt])
 
   async function add() {
     const trimmed = value.trim()
-    if (!trimmed) return
+    if (!trimmed || busy) return
     setBusy(true)
     setMessage(null)
     try {
@@ -95,6 +87,7 @@ export function BlocksPanel() {
   }
 
   async function remove(block: BlockRow) {
+    if (busy) return
     setBusy(true)
     setMessage(null)
     try {
@@ -121,7 +114,7 @@ export function BlocksPanel() {
   }
 
   if (error) {
-    return <EmptyState title="The blocklist could not be loaded." body={error} />
+    return <div className="space-y-3"><EmptyState title="The blocklist could not be loaded." body={error} /><Button variant="outline" size="md" onClick={retryLoad}>Retry</Button></div>
   }
 
   const grouped: Record<BlockKind, BlockRow[]> = { artist: [], keyword: [], video_id: [] }
@@ -193,9 +186,10 @@ export function BlocksPanel() {
                     >
                       <code className="t-small font-mono">{block.value}</code>
                       <button
-                        type="button"
+                       type="button"
+                        disabled={busy}
                         onClick={() => void remove(block)}
-                        className="t-small text-ink/60 transition-colors hover:text-orange"
+                        className="t-small text-ink/60 transition-colors hover:text-orange disabled:opacity-40"
                       >
                         Remove
                       </button>
