@@ -51,7 +51,7 @@ function video(
     id: videoId,
     snippet: {
       title: options.title ?? 'A Song',
-      channelTitle: options.channelTitle ?? 'Some Channel',
+      channelTitle: options.channelTitle ?? 'Some Artist - Topic',
       channelId: 'UC_channel',
       categoryId: '10',
       liveBroadcastContent: options.live ?? 'none',
@@ -142,6 +142,27 @@ describe('the search asks the upstream for music, not for uploads', () => {
 /* ── the client-side filter ─────────────────────────────────────────────── */
 
 describe('the search keeps the recordings and drops everything else', () => {
+  it('keeps only Topic and VEVO channels in free-text search', async () => {
+    installFetch((url) => {
+      if (url.pathname.endsWith('/search')) {
+        return jsonResponse({ items: [hit('topic'), hit('vevo'), hit('official'), hit('label'), hit('user')] })
+      }
+      return jsonResponse({
+        items: [
+          video('topic', { channelTitle: 'Artist - Topic' }),
+          video('vevo', { channelTitle: 'ArtistVEVO' }),
+          video('official', { channelTitle: 'Artist Official' }),
+          video('label', { channelTitle: 'Artist Records' }),
+          video('user', { channelTitle: 'Fan Uploads' }),
+        ],
+      })
+    })
+
+    const tracks = await searchSeeds('jazz', createMeter())
+
+    expect(tracks.map((track) => track.videoId)).toEqual(['topic', 'vevo'])
+  })
+
   it('drops a mix, a live broadcast and a stream', async () => {
     installFetch((url) => {
       if (url.pathname.endsWith('/search')) {
@@ -177,6 +198,17 @@ describe('the search keeps the recordings and drops everything else', () => {
 })
 
 describe('artist channel expansion uses the same music-only filter', () => {
+  it('rejects videos from a channel that is not Topic or VEVO', async () => {
+    installFetch((url) => {
+      if (url.pathname.endsWith('/search')) return jsonResponse({ items: [hit('upload')] })
+      return jsonResponse({ items: [video('upload', { channelTitle: 'Fan Uploads' })] })
+    })
+
+    const tracks = await searchByChannelId('UC_artist', createMeter())
+
+    expect(tracks).toEqual([])
+  })
+
   it('drops music-video and lyric-video uploads while keeping official audio', async () => {
     installFetch((url) => {
       if (url.pathname.endsWith('/search')) {
@@ -209,7 +241,7 @@ describe('the search answers what was asked', () => {
         items: [
           video('other', {
             title: 'Something Else',
-            channelTitle: 'A Different Channel',
+            channelTitle: 'A Different Artist - Topic',
             duration: 'PT3M30S',
             categories: ['Pop_music'],
           }),
@@ -237,13 +269,13 @@ describe('the search answers what was asked', () => {
         items: [
           video('nogenre', {
             title: 'Something Else',
-            channelTitle: 'A Different Channel',
+            channelTitle: 'A Different Artist - Topic',
             duration: 'PT3M30S',
             categories: ['Heavy_metal'],
           }),
           video('jazztrack', {
             title: 'Blue Train',
-            channelTitle: 'A Different Channel',
+            channelTitle: 'A Different ArtistVEVO',
             duration: 'PT3M30S',
             categories: ['Jazz'],
           }),
@@ -265,7 +297,7 @@ describe('the search answers what was asked', () => {
         items: [
           video('lofi', {
             title: 'A Lo-fi Beat',
-            channelTitle: 'A Radio Channel',
+            channelTitle: 'A Radio Artist - Topic',
             duration: 'PT3M30S',
             categories: ['Electronic_music'],
           }),
