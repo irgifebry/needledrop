@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 import { PlaylistCover } from '@/components/library/playlist-cover'
 import { PrivacyBadge } from '@/components/library/privacy-badge'
@@ -38,6 +39,9 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+  const [mutating, setMutating] = useState(false)
+  const mutationLock = useRef(false)
+  const [attempt, setAttempt] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const [failed, setFailed] = useState<Array<{ id: string; reason: string }>>([])
 
@@ -48,17 +52,11 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
   const [privacy, setPrivacy] = useState<'private' | 'unlisted' | 'public'>('private')
   const [confirmPublic, setConfirmPublic] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-    fetch(`/api/playlists/${playlistId}`)
-      .then((response) =>
-        response
-          .json()
-          .catch(() => null)
-          .then((payload) => ({ response, payload })),
-      )
-      .then(({ response, payload }) => {
-        if (cancelled) return
+  const loadPlaylist = useCallback(async (isCancelled: () => boolean) => {
+    try {
+        const response = await fetch(`/api/playlists/${playlistId}`)
+        const payload = await response.json().catch(() => null)
+        if (isCancelled()) return
         setError(null)
         setNotice(null)
         setFailed([])
@@ -81,18 +79,22 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
         setDescription(next.playlist.description)
         setTags('')
         setPrivacy(next.playlist.privacy)
-      })
-      .catch(() => {
-        if (cancelled) return
+    } catch {
+        if (isCancelled()) return
         setError('This playlist could not be loaded. Check your connection and try again.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
+    } finally {
+        if (!isCancelled()) setLoading(false)
     }
   }, [playlistId])
+
+  useEffect(() => {
+    let cancelled = false
+    const timer = window.setTimeout(() => void loadPlaylist(() => cancelled), 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [playlistId, attempt, loadPlaylist])
 
   const tagList = useMemo(
     () =>
@@ -111,11 +113,13 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
       tagList.join(',') !== '')
 
   async function saveMetadata() {
+    if (mutationLock.current) return
     if (!state) return
     if (privacy === 'public' && !confirmPublic) {
       setNotice('Publishing is effectively irreversible. Tick the confirmation to save as public.')
       return
     }
+    mutationLock.current = true
     setSaving(true)
     setNotice(null)
     setFailed([])
@@ -146,11 +150,13 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
     } catch {
       setNotice('The playlist could not be saved. Check your connection and try again.')
     } finally {
+      mutationLock.current = false
       setSaving(false)
     }
   }
 
   async function moveItem(index: number, direction: -1 | 1) {
+    if (mutationLock.current) return
     if (!state) return
     const target = index + direction
     if (target < 0 || target >= state.items.length) return
@@ -159,6 +165,9 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
     next.splice(target, 0, moved)
     // `order` holds VIDEO ids, not playlist item ids.
     const order = next.map((item) => item.videoId)
+    mutationLock.current = true
+    setMutating(true)
+    setNotice(null)
     setFailed([])
     try {
       const response = await fetch(`/api/playlists/${playlistId}/items`, {
@@ -188,12 +197,19 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
       }
     } catch {
       setNotice('The reorder could not be applied. Check your connection and try again.')
+    } finally {
+      mutationLock.current = false
+      setMutating(false)
     }
   }
 
   async function removeItem(item: PlaylistItemSummary) {
+    if (mutationLock.current) return
     if (!state) return
     // `remove` holds PLAYLIST ITEM ids (`item.id`), NOT video ids.
+    mutationLock.current = true
+    setMutating(true)
+    setNotice(null)
     setFailed([])
     try {
       const response = await fetch(`/api/playlists/${playlistId}/items`, {
@@ -223,10 +239,17 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
       }
     } catch {
       setNotice('That track could not be removed. Check your connection and try again.')
+    } finally {
+      mutationLock.current = false
+      setMutating(false)
     }
   }
 
   async function deletePlaylist() {
+    if (mutationLock.current) return
+    mutationLock.current = true
+    setMutating(true)
+    setNotice(null)
     try {
       const response = await fetch(`/api/playlists/${playlistId}`, {
         method: 'DELETE',
@@ -245,6 +268,9 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
       router.refresh()
     } catch {
       setNotice('The playlist could not be deleted. Check your connection and try again.')
+    } finally {
+      mutationLock.current = false
+      setMutating(false)
     }
   }
 
@@ -281,13 +307,15 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
                 ? 'Sign in with Google to open this playlist.'
                 : error}
         </p>
-        {status === 401 ? (
+         {status === 401 ? (
           <a href="/api/auth/google" className="mt-5 inline-flex">
             <button type="button" className="h-11 border-2 border-ink bg-ink px-5 t-body font-semibold text-paper hover:bg-orange hover:text-ink">
               Sign in with Google
             </button>
           </a>
-        ) : null}
+         ) : null}
+         {status === 403 ? <a href="/api/auth/google" className="mt-5 inline-flex h-11 items-center border-2 border-ink px-5 t-body font-semibold">Review Google permissions</a> : null}
+          {status !== 401 && status !== 403 && status !== 404 ? <button type="button" className="mt-5 h-11 border-2 border-ink px-5 t-body font-semibold" onClick={() => { setLoading(true); setAttempt((value) => value + 1) }}>Retry</button> : null}
       </div>
     )
   }
@@ -296,6 +324,7 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
 
   return (
     <div>
+      <Link href="/library" className="mb-6 inline-flex min-h-11 items-center border-2 border-ink px-4 t-body font-semibold hover:bg-ink hover:text-paper">← Back to library</Link>
       <div className="grid grid-cols-12 items-start gap-[var(--gap)]">
         <div className="col-span-12 lg:col-span-4">
           <PlaylistCover thumbnail={playlist.thumbnail} title={playlist.title} size="lg" />
@@ -410,12 +439,12 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
           <Button
             variant="mint"
             size="md"
-            disabled={!dirty || saving}
+             disabled={!dirty || saving || mutating}
             onClick={() => void saveMetadata()}
           >
             {saving ? 'Saving…' : 'Save changes'}
           </Button>
-          {notice ? <p className="t-small text-ink/70">{notice}</p> : null}
+           {notice ? <p role="status" aria-live="polite" className="t-small text-ink/70">{notice}</p> : null}
         </div>
       </section>
 
@@ -461,7 +490,7 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
                   <button
                     type="button"
                     aria-label={`Move ${item.title} up`}
-                    disabled={index === 0}
+                     disabled={index === 0 || mutating}
                     onClick={() => void moveItem(index, -1)}
                     className="flex size-9 items-center justify-center border-2 border-ink/40 text-ink transition-colors hover:border-ink disabled:opacity-30"
                   >
@@ -470,7 +499,7 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
                   <button
                     type="button"
                     aria-label={`Move ${item.title} down`}
-                    disabled={index === state.items.length - 1}
+                     disabled={index === state.items.length - 1 || mutating}
                     onClick={() => void moveItem(index, 1)}
                     className="flex size-9 items-center justify-center border-2 border-ink/40 text-ink transition-colors hover:border-ink disabled:opacity-30"
                   >
@@ -478,7 +507,8 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
                   </button>
                   <button
                     type="button"
-                    aria-label={`Remove ${item.title}`}
+                     aria-label={`Remove ${item.title}`}
+                     disabled={mutating}
                     onClick={() => void removeItem(item)}
                     className="flex size-9 items-center justify-center border-2 border-ink/40 text-ink transition-colors hover:border-orange hover:text-orange"
                   >
@@ -539,8 +569,9 @@ export function PlaylistEditor({ playlistId }: { playlistId: string }) {
                     Keep it
                   </button>
                 </DialogClose>
-                <button
+                 <button
                   type="button"
+                  disabled={mutating}
                   onClick={() => void deletePlaylist()}
                   className="h-11 border-2 border-orange bg-orange px-5 t-body font-semibold text-ink transition-colors hover:bg-ink hover:text-orange"
                 >
