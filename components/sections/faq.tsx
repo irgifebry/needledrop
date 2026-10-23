@@ -6,7 +6,7 @@ const QUESTIONS = [
   {
     question: 'Does it download any audio?',
     answer:
-      'No. Nothing is fetched, stored, remixed or separated. needledrop reads titles, channels, topics, durations and thumbnails, then writes a playlist of links that YouTube Music plays for you.',
+      'No audio is downloaded or processed. needledrop reads YouTube metadata such as titles, channels, topics, durations and thumbnails, then writes a playlist of links that YouTube Music plays for you.',
   },
   {
     question: 'How does it know what sounds similar?',
@@ -16,7 +16,7 @@ const QUESTIONS = [
   {
     question: 'What does a playlist cost?',
     answer:
-      'Around 1,450 units for a 20-track playlist against a daily pool of 10,000. The estimate is on screen before you commit, and a dry run costs nothing at all.',
+      'Discovery costs vary with the searches and results needed, and the app shows an estimate before you commit. Writing to YouTube costs 50 units to create a playlist plus 50 units for each track inserted; the actual total can vary if tracks fail or calls need retrying.',
   },
   {
     question: 'Is my playlist public?',
@@ -26,12 +26,17 @@ const QUESTIONS = [
   {
     question: 'Can I use my own API key?',
     answer:
-      'Yes, behind a labelled toggle next to the search box. Your own key spends your own quota instead of the shared one, and it is stored encrypted in this browser — never logged, never sent anywhere but YouTube. Remove it whenever you like.',
+      'Yes. Add your YouTube Data API key in Settings to use it for live searches and spend your own YouTube quota. The key is stored in a sealed cookie and can be removed from Settings. Google sign-in is still used separately when you save a playlist.',
   },
   {
     question: 'What happens when the shared quota runs out?',
     answer:
-      'Searches stop until midnight Pacific Time, when the quota resets. Nothing is lost and no playlist is half-made: the app says which limit was hit, and adding your own key keeps you working straight away.',
+      'Live searches stop when the available quota is exhausted. You can add your own YouTube Data API key in Settings to use your own quota. If a playlist write has already started, some tracks may not be added; the app reports which could not be added and keeps the playlist when possible.',
+  },
+  {
+    question: 'What does demo mode do?',
+    answer:
+      'Without a live YouTube Data API key, searches use the built-in demo catalogue. You can explore the flow, but a demo run does not create a playlist on YouTube.',
   },
   {
     question: 'Why might a track not play in YouTube Music?',
@@ -41,7 +46,7 @@ const QUESTIONS = [
   {
     question: 'What happens to my Google data?',
     answer:
-      'needledrop’s use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements. We read YouTube metadata to build your playlist, keep your token in an encrypted cookie, and delete everything on request. No audio, no selling, no model training. The full policy is on the privacy page.',
+      'needledrop’s use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements. We read YouTube metadata to build your playlist and keep your token in an encrypted cookie. You can request deletion of your saved app data from the privacy page. No audio, no selling, no model training. The full policy is on the privacy page.',
   },
 ]
 
@@ -56,12 +61,12 @@ export function Faq() {
             </Reveal>
           </div>
           <Image
-            src="/img/duke-of-earl-by-gene-chandler.jpg"
-            alt="Public domain artwork for the 1961 single Duke of Earl by Gene Chandler"
+            src="/img/kehlani-it-was-good-until-it-wasnt.jpg"
+            alt="Album cover for Kehlani's It Was Good Until It Wasn't"
             width={1370}
             height={1370}
             loading="lazy"
-            className="pointer-events-none absolute right-[4vw] top-1/2 hidden w-[16vw] -translate-y-1/2 rotate-[6deg] border-4 border-ink object-cover lg:block"
+            className="pointer-events-none absolute right-[4vw] bottom-[4svh] w-[30vw] rotate-[6deg] border-4 border-ink object-cover opacity-40 sm:w-[24vw] sm:opacity-70 lg:bottom-auto lg:top-1/2 lg:w-[16vw] lg:-translate-y-1/2 lg:opacity-100"
           />
         </div>
 
