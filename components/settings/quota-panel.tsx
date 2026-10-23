@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatUnits, UNIT_COST } from '@/lib/quota'
@@ -54,34 +55,28 @@ export function QuotaPanel() {
   const [data, setData] = useState<QuotaResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+
+  function retryLoad() {
+    setLoading(true)
+    setError(null)
+    setLoadAttempt((attempt) => attempt + 1)
+  }
 
   useEffect(() => {
-    let cancelled = false
-    fetch('/api/quota')
-      .then((response) =>
-        response
-          .json()
-          .catch(() => null)
-          .then((payload) => ({ response, payload })),
-      )
-      .then(({ response, payload }) => {
-        if (cancelled) return
-        if (!response.ok) {
-          setError((payload && typeof payload.message === 'string' && payload.message) || 'The budget could not be loaded.')
-          return
-        }
-        setData(payload as QuotaResponse)
-      })
-      .catch(() => {
-        if (!cancelled) setError('The budget could not be loaded. Check your connection and try again.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    let active = true
+    const result = fetch('/api/quota')
+      .then(async (response) => ({ response, payload: await response.json().catch(() => null) }))
+      .catch(() => null)
+    void result.then((loaded) => {
+      if (!active) return
+      if (!loaded) setError('The budget could not be loaded. Check your connection and try again.')
+      else if (!loaded.response.ok) setError(loaded.payload?.message || 'The budget could not be loaded.')
+      else setData(loaded.payload as QuotaResponse)
+      setLoading(false)
+    })
+    return () => { active = false }
+  }, [loadAttempt])
 
   if (loading) {
     return (
@@ -95,10 +90,13 @@ export function QuotaPanel() {
 
   if (error || !data) {
     return (
-      <EmptyState
-        title="The budget could not be loaded."
-        body={error ?? 'Try again in a moment.'}
-      />
+      <div className="space-y-3">
+        <EmptyState
+          title="The budget could not be loaded."
+          body={error ?? 'Try again in a moment.'}
+        />
+        <Button variant="outline" size="md" onClick={retryLoad}>Retry</Button>
+      </div>
     )
   }
 
@@ -122,6 +120,10 @@ export function QuotaPanel() {
           </p>
         </div>
       ) : null}
+
+      <p className="t-small text-ink/60">
+        Quota is measured in YouTube Data API units, not tracks or dollars. Shared-project values cover visitors using the app&apos;s key; a visitor&apos;s optional personal key uses that Google Cloud project&apos;s separate quota and is not included here.
+      </p>
 
       {data.budget.sessionExceeded || data.budget.globalExceeded ? (
         <div className="border-2 border-orange bg-paper p-5">
