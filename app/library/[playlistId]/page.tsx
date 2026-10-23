@@ -27,7 +27,7 @@ export default async function PlaylistPage({
     <>
       <main className="bg-paper text-ink">
         <section data-chapter="ink" className="bg-ink text-paper">
-          <div className="shell pt-[calc(4.5rem_+_6svh)] pb-[6svh]">
+          <div className="shell page-hero-content">
             <p className="t-small uppercase tracking-widest text-paper/60">Library</p>
             <h1 className="display t-mega mt-4 leading-[0.9]">Edit your YouTube playlist.</h1>
             <p className="t-lead mt-6 max-w-[60ch] text-paper/75">
