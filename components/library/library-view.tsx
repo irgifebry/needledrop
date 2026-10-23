@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { PlaylistRow } from '@/components/library/playlist-row'
@@ -44,41 +44,36 @@ export function LibraryView({ signedIn }: { signedIn: boolean }) {
   const [loading, setLoading] = useState(signedIn)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<number | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
-  useEffect(() => {
+  const loadLibrary = useCallback(async (signal: () => boolean) => {
     if (!signedIn) return
-    let cancelled = false
-    fetch('/api/library')
-      .then((response) =>
-        response
-          .json()
-          .catch(() => null)
-          .then((payload) => ({ response, payload })),
-      )
-      .then(({ response, payload }) => {
-        if (cancelled) return
-        setStatus(response.status)
-        if (!response.ok) {
-          setError(
-            (payload && typeof payload.message === 'string' && payload.message) ||
-              'The library could not be loaded.',
-          )
-          setData(null)
-          return
-        }
-        setData(payload as LibraryResponse)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setError('The library could not be loaded. Check your connection and try again.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
+    try {
+      const response = await fetch('/api/library')
+      const payload = await response.json().catch(() => null)
+      if (signal()) return
+      setStatus(response.status)
+      if (!response.ok) {
+        setError((payload && typeof payload.message === 'string' && payload.message) || 'The library could not be loaded.')
+        setData(null)
+        return
+      }
+      setData(payload as LibraryResponse)
+    } catch {
+      if (!signal()) setError('The library could not be loaded. Check your connection and try again.')
+    } finally {
+      if (!signal()) setLoading(false)
     }
   }, [signedIn])
+
+  useEffect(() => {
+    let cancelled = false
+    const timer = window.setTimeout(() => void loadLibrary(() => cancelled), 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [signedIn, attempt, loadLibrary])
 
   if (!signedIn) {
     return (
@@ -116,12 +111,14 @@ export function LibraryView({ signedIn }: { signedIn: boolean }) {
     return (
       <div className="border-2 border-ink bg-paper p-6">
         <p className="t-title font-semibold">
-          {status === 403 ? 'Playlist access is not allowed.' : 'The library could not be loaded.'}
+          {status === 403 ? 'Playlist access is not allowed.' : status === 401 ? 'Sign-in is required.' : 'The library could not be loaded.'}
         </p>
         <p className="t-body mt-3 text-ink/75">
           {status === 403
             ? 'Your Google account cannot read your YouTube playlists. Sign in again and allow playlist access.'
-            : error}
+            : status === 401
+              ? 'Your Google sign-in has expired. Sign in again to continue.'
+              : error}
         </p>
         {status === 401 ? (
           <a href="/api/auth/google" className="mt-5 inline-flex">
@@ -130,6 +127,7 @@ export function LibraryView({ signedIn }: { signedIn: boolean }) {
             </button>
           </a>
         ) : null}
+        {status !== 401 && status !== 403 ? <button type="button" className="mt-5 h-11 border-2 border-ink px-5 t-body font-semibold" onClick={() => { setLoading(true); setAttempt((value) => value + 1) }}>Retry</button> : null}
       </div>
     )
   }
