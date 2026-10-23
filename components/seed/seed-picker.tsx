@@ -36,6 +36,7 @@ export function SeedPicker({
   const [demoMode, setDemoMode] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
+  const searchInFlightRef = useRef(false)
 
   useEffect(() => {
     fetch('/api/quota')
@@ -58,7 +59,8 @@ export function SeedPicker({
   }, [])
 
   const runSearch = useCallback(async () => {
-    if (!query.trim()) return
+    if (!query.trim() || searchInFlightRef.current) return
+    searchInFlightRef.current = true
     setBusy(true)
     setError(null)
     setSeeds([])
@@ -83,6 +85,7 @@ export function SeedPicker({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The search failed.')
     } finally {
+      searchInFlightRef.current = false
       setBusy(false)
     }
   }, [onUnitsSpent, query])
