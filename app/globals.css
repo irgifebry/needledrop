@@ -109,6 +109,11 @@
   max-width: 1680px;
 }
 
+@utility page-hero-content {
+  padding-block-start: calc(5rem + 6svh);
+  padding-block-end: 6svh;
+}
+
 @utility grid-12 {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
