@@ -21,9 +21,12 @@ import { Button } from '@/components/ui/button'
  * Both are irreversible, so the destructive one is behind an explicit
  * confirmation rather than a single click.
  */
-export function DataControls() {
+type DataControlsProps = { signedIn: boolean }
+
+export function DataControls({ signedIn }: DataControlsProps) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
+  const [logoutBusy, setLogoutBusy] = useState(false)
 
   async function deleteEverything() {
     const confirmed = window.confirm(
@@ -46,8 +49,18 @@ export function DataControls() {
         return
       }
 
-      toast.success('Everything stored for this browser is gone.', {
-        description: 'Your playlists on YouTube were not touched — they belong to your account.',
+      const result = (await response.json()) as {
+        deleted?: Record<string, number>
+        store?: 'memory' | 'postgres'
+      }
+      if (!result.deleted || !result.store) throw new Error('Deletion response was incomplete')
+      const counts = Object.entries(result.deleted)
+        .filter(([, count]) => count > 0)
+        .map(([kind, count]) => `${count} ${kind}`)
+      const store = result.store === 'postgres' ? 'Postgres' : 'in-memory store'
+      const deletedDescription = counts.length ? `Deleted ${counts.join(', ')} from the ${store}.` : `No matching rows were found in the ${store}.`
+      toast.success('Anonymous data deletion completed.', {
+        description: `${deletedDescription} Google playlists, sign-in, and your saved API key were not changed.${result.store === 'memory' ? ' Data in an unavailable Postgres database was not deleted.' : ''}`,
       })
     } catch {
       toast.error('Nothing was deleted.', {
@@ -61,24 +74,28 @@ export function DataControls() {
   async function signOut() {
     setBusy(true)
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
+      const response = await fetch('/api/auth/logout', { method: 'POST' })
       // The logout route redirects; a fetch follows that redirect silently, so
       // the navigation is done here.
+      if (!response.redirected && !response.ok) throw new Error('Logout request failed')
       router.replace('/')
       router.refresh()
     } catch {
       toast.error('Sign out failed.', { description: 'Check your connection and try again.' })
       setBusy(false)
+      setLogoutBusy(false)
     }
   }
 
   return (
     <div className="flex flex-wrap gap-3">
-      <Button type="button" variant="outline" onClick={signOut} disabled={busy}>
-        Sign out and revoke access
-      </Button>
+      {signedIn ? (
+        <Button type="button" variant="outline" onClick={() => { setBusy(true); setLogoutBusy(true); void signOut() }} disabled={busy}>
+          {logoutBusy ? 'Signing out…' : 'Sign out and revoke access'}
+        </Button>
+      ) : null}
       <Button type="button" variant="ink" onClick={deleteEverything} disabled={busy}>
-        Delete all my data
+        Delete my anonymous data
       </Button>
     </div>
   )
