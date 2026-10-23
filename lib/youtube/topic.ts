@@ -95,8 +95,10 @@ export function topicCategoriesOf(videoItem: TopicItemLike): string[] {
 
 /** Whether two tracks describe the same Wikipedia topic. */
 export function sameTopic(a: Track, b: Track): boolean {
-  if (!a.topicId || !b.topicId) return false
-  return a.topicId === b.topicId
+  if (a.topicId && b.topicId) return a.topicId === b.topicId
+  // The Data API no longer returns a usable topic id, so fall back to the
+  // shared genre categories — the same signal the scoring engine uses.
+  return sameGenre(a, b)
 }
 
 /**
@@ -107,8 +109,14 @@ export function sameTopic(a: Track, b: Track): boolean {
  * "Indonesian pop".
  */
 export function sameGenre(a: Track, b: Track): boolean {
-  const left = new Set((a.topicCategories ?? []).map((category) => slug(category)))
-  const right = new Set((b.topicCategories ?? []).map((category) => slug(category)))
+  const leftCategories = [...(a.topicCategories ?? []), ...(a.topicCategoryNames ?? [])]
+  const rightCategories = [...(b.topicCategories ?? []), ...(b.topicCategoryNames ?? [])]
+  const left = new Set(
+    leftCategories.map((category) => slug(category)).filter((value) => value && value !== 'music'),
+  )
+  const right = new Set(
+    rightCategories.map((category) => slug(category)).filter((value) => value && value !== 'music'),
+  )
   for (const category of left) {
     if (category && right.has(category)) return true
   }

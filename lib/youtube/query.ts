@@ -123,7 +123,7 @@ function categoriesOf(track: Track): string[] {
 
   return names
     .map((name) => normalizeCategory(name))
-    .filter((name) => name.length > 0)
+    .filter((name) => name.length > 0 && name !== 'music')
 }
 
 /** The words of the title, folded. */

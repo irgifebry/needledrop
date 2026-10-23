@@ -75,7 +75,7 @@ export function buildSeedProfile(
       : (track.topicCategories ?? [])
     for (const category of categories) {
       const normalized = foldText(topicDisplayName(category)).trim()
-      if (normalized) topicCategories.add(normalized)
+      if (normalized && normalized !== 'music') topicCategories.add(normalized)
     }
 
     if (track.durationSec > 0) {
@@ -224,7 +224,7 @@ export function seedContextOf(seed: SeedLike): SeedContext {
     : (seed.topicCategories ?? [])
   for (const category of categories) {
     const normalized = foldText(topicDisplayName(category)).trim()
-    if (normalized) topicCategories.add(normalized)
+    if (normalized && normalized !== 'music') topicCategories.add(normalized)
   }
 
   return {

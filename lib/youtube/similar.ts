@@ -24,6 +24,7 @@ import {
   versionKeyOf,
 } from '@/lib/youtube/normalize'
 import { isRegionSafe, languageMatches } from '@/lib/youtube/regions'
+import { isMusicVideo } from '@/lib/youtube/music'
 import type {
   Candidate,
   DiscoveryOptions,
@@ -53,6 +54,8 @@ export type SelectContext = {
   libraryVideoIds?: string[]
   /** Canonical track keys already in the user's library. */
   libraryTrackKeys?: string[]
+  /** Topic categories of the seed, used to keep candidates in the same genre. */
+  seedTopicCategories?: string[]
 }
 
 /**
@@ -169,6 +172,34 @@ function passesHardFilters(
 
   // Not music. An unknown category is kept; only a known non-music one is dropped.
   if (candidate.categoryId && candidate.categoryId !== '10') return false
+
+  // Only audio recordings, not music videos (PLAN §4 "music only").
+  if (isMusicVideo(candidate)) return false
+
+  // Keep the playlist in the seed's genre: when the seed carries genre
+  // categories, a candidate that carries its own categories must share at
+  // least one of them. Candidates without categories are left alone so a
+  // genre the API files under an unexpected name never comes back empty.
+  const normalizeCategory = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .replace(/[^a-z0-9]+/g, '')
+  const seedCategories = (context.seedTopicCategories ?? [])
+    .map((category) => normalizeCategory(category))
+    .filter((category) => category.length > 0 && category !== 'music')
+  if (seedCategories.length > 0) {
+    const candidateCategories = [
+      ...(candidate.topicCategoryNames ?? []),
+      ...(candidate.topicCategories ?? []),
+    ]
+      .map((category) => normalizeCategory(category))
+      .filter((category) => category.length > 0 && category !== 'music')
+    if (candidateCategories.length > 0 && !candidateCategories.some((category) => seedCategories.includes(category))) {
+      return false
+    }
+  }
 
   // Embeddable previews (PLAN §13.1.7).
   if (candidate.embeddable === false) return false

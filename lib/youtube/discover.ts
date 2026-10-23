@@ -239,7 +239,7 @@ export async function discover(
   const hydrated = new Map<string, Track>()
 
   // 1 — Regional trending chart. One unit, and it arrives fully hydrated.
-  await collectTrending(meter, context, sources, hydrated)
+  await collectTrending(seed, meter, context, sources, hydrated)
   // 2 — Artist radio. Two units (channels.list + playlistItems.list).
   await collectArtistRadio(seed, meter, context, sources)
   // 3 — Curated playlists. One unit each, only for operator-verified ids.
@@ -294,6 +294,7 @@ function pendingIds(sources: Map<string, SourceKind[]>, hydrated: Map<string, Tr
  * source in the pipeline by an order of magnitude.
  */
 async function collectTrending(
+  seed: Track,
   meter: QuotaMeter,
   context: DiscoverContext,
   sources: Map<string, SourceKind[]>,
@@ -314,10 +315,34 @@ async function collectTrending(
       { sessionId: context.sessionId, runId: context.runId, apiKeyOverride: context.apiKeyOverride },
     )
 
+    const normalizeCategory = (value: string) =>
+      value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '')
+        .replace(/[^a-z0-9]+/g, '')
+    const seedCategories = [
+      ...(seed.topicCategoryNames ?? []),
+      ...(seed.topicCategories ?? []),
+    ]
+      .map((category) => normalizeCategory(category))
+      .filter((category) => category.length > 0 && category !== 'music')
+
     const ids: string[] = []
     for (const item of response.items ?? []) {
       const track = trackFromVideo(item)
       if (!track) continue
+      if (seedCategories.length > 0) {
+        const trackCategories = [
+          ...(track.topicCategoryNames ?? []),
+          ...(track.topicCategories ?? []),
+        ]
+          .map((category) => normalizeCategory(category))
+          .filter((category) => category.length > 0 && category !== 'music')
+        if (trackCategories.length > 0 && !trackCategories.some((category) => seedCategories.includes(category))) {
+          continue
+        }
+      }
       hydrated.set(track.videoId, track)
       ids.push(track.videoId)
     }
@@ -745,6 +770,20 @@ function finalize(
     seedArtistKeys: options.hideSeedArtist ? [...seedArtists(seed).keys()] : [],
     userRegion: context.region ?? null,
     libraryTrackKeys: options.skipAlreadyInLibrary ? [...libraryKeys] : [],
+    seedTopicCategories: (() => {
+      const all = [
+        ...(seed.topicCategoryNames ?? []),
+        ...(seed.topicCategories ?? []),
+      ]
+        .map((category) => category.trim())
+        .filter((category) => category.length > 0 && category.toLowerCase() !== 'music')
+      // Prefer a specific genre over the catch-all "Pop music" bucket when the
+      // seed carries both, so a soul/R&B seed does not admit hip-hop tracks
+      // merely because they share the pop bucket.
+      const specific = all.find((category) => category.toLowerCase() !== 'pop music')
+      const primary = specific ?? all[0]
+      return primary ? [primary] : all
+    })(),
   })
 
   return orderCandidates(selected, options)

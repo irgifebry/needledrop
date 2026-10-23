@@ -122,8 +122,29 @@ export function explainScore(
   const candidateArtistKey = artistKey(candidateArtist)
   const seedArtist = context.artists.get(candidateArtistKey)
 
-  if (candidate.topicId && context.topicIds.has(candidate.topicId)) {
-    const topicName = topicDisplayName(context.topicName || candidate.topicName)
+  // The Data API no longer returns a usable topic id (it is always empty),
+  // so the topic signal is keyed on the Wikipedia topic *categories* instead:
+  // two tracks that share a genre category are treated as the same topic.
+  const candidateCategories = candidate.topicCategoryNames?.length
+    ? candidate.topicCategoryNames
+    : (candidate.topicCategories ?? [])
+  const sharedCategory = candidateCategories.find((category) => {
+    const normalized = foldText(topicDisplayName(category)).trim()
+    // The generic "Music" category is attached to almost every track and
+    // carries no genre signal, so it must never count as a topic match.
+    if (normalized === 'music') return false
+    return context.topicCategories.has(normalized)
+  })
+  const topicMatch =
+    (candidate.topicId.length > 0 && context.topicIds.has(candidate.topicId)) ||
+    sharedCategory !== undefined
+
+  if (topicMatch) {
+    const topicName = topicDisplayName(
+      (context.topicName && context.topicName !== 'Unknown topic'
+        ? context.topicName
+        : candidate.topicName) || sharedCategory || '',
+    )
     reasons.push({
       kind: 'topic',
       label: topicName && topicName !== 'Unknown topic'
@@ -160,13 +181,15 @@ export function explainScore(
   }
 
   // The human-readable category titles are preferred when the API has them.
-  const candidateCategories = candidate.topicCategoryNames?.length
+  const candidateGenreCategories = candidate.topicCategoryNames?.length
     ? candidate.topicCategoryNames
     : (candidate.topicCategories ?? [])
-  if (candidateCategories.length > 0) {
-    const shared = candidateCategories.find((category) =>
-      context.topicCategories.has(foldText(topicDisplayName(category)).trim()),
-    )
+  if (candidateGenreCategories.length > 0) {
+    const shared = candidateGenreCategories.find((category) => {
+      const normalized = foldText(topicDisplayName(category)).trim()
+      if (normalized === 'music') return false
+      return context.topicCategories.has(normalized)
+    })
     if (shared) {
       reasons.push({
         kind: 'genre',
