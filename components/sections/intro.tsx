@@ -15,11 +15,11 @@ export function Intro() {
         </Reveal>
 
         <Image
-          src="/img/das-vinyl-dreht-sich.jpg"
-          alt="A tonearm tracking across a black vinyl record"
+          src="/img/sza-ctrl.jpg"
+          alt="Album cover for SZA's Ctrl"
           width={1920}
           height={1280}
-          className="pointer-events-none absolute right-[5vw] top-[14svh] hidden w-[17vw] rotate-[4deg] border-4 border-ink object-cover lg:block"
+          className="pointer-events-none absolute right-[4vw] bottom-[8svh] w-[30vw] rotate-[4deg] border-4 border-ink object-cover opacity-40 sm:w-[28vw] sm:opacity-70 lg:bottom-auto lg:top-[14svh] lg:w-[17vw] lg:opacity-100"
           loading="eager"
         />
       </div>
