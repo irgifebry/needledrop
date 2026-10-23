@@ -7,11 +7,9 @@ import { Menu, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
-const LINKS = [
-  { href: '#how', label: 'How it works' },
-  { href: '#why', label: 'Why it works' },
-  { href: '#faq', label: 'FAQ' },
-]
+// Home-page section anchors used by footer links: #top #how #why #faq
+
+
 
 export function SiteHeader() {
   const pathname = usePathname()
@@ -19,6 +17,20 @@ export function SiteHeader() {
   const [chapter, setChapter] = useState('orange')
   const [menuOpen, setMenuOpen] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setMenuOpen(false)
+      menuButtonRef.current?.focus()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [menuOpen])
 
   // Colour by chapter: the header takes the ink of the field beneath it.
   useEffect(() => {
@@ -75,15 +87,14 @@ export function SiteHeader() {
       </a>
 
       <nav className="hidden items-center gap-7 md:flex">
-        {LINKS.map((link) => (
-          <a
-            key={link.href}
-            href={onHome ? link.href : `/${link.href}`}
-            className="t-small font-semibold text-[var(--header-ink)] opacity-80 transition-opacity hover:opacity-100"
-          >
-            {link.label}
-          </a>
-        ))}
+        <Link
+          href="/"
+          scroll={false}
+          onMouseDown={() => window.scrollTo({ top: 0, behavior: 'instant' })}
+          className="t-small font-semibold text-[var(--header-ink)] opacity-80 transition-opacity hover:opacity-100"
+        >
+          Home
+        </Link>
         <Link
           href="/library"
           className="t-small font-semibold text-[var(--header-ink)] opacity-80 transition-opacity hover:opacity-100"
@@ -99,6 +110,7 @@ export function SiteHeader() {
       </nav>
 
       <button
+        ref={menuButtonRef}
         type="button"
         className="ml-auto inline-flex size-10 items-center justify-center text-[var(--header-ink)] md:hidden"
         aria-expanded={menuOpen}
@@ -123,16 +135,15 @@ export function SiteHeader() {
         )}
       >
         <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
-          {LINKS.map((link) => (
-            <a
-              key={link.href}
-              href={onHome ? link.href : `/${link.href}`}
-              className="t-small font-semibold text-[var(--header-ink)]"
-              onClick={() => setMenuOpen(false)}
-            >
-              {link.label}
-            </a>
-          ))}
+          <Link
+            href="/"
+            scroll={false}
+            onMouseDown={() => window.scrollTo({ top: 0, behavior: 'instant' })}
+            className="t-small font-semibold text-[var(--header-ink)]"
+            onClick={() => setMenuOpen(false)}
+          >
+            Home
+          </Link>
           <Link
             href="/library"
             className="t-small font-semibold text-[var(--header-ink)]"
