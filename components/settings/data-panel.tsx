@@ -29,6 +29,7 @@ export function DataPanel() {
   const [store, setStore] = useState<'memory' | 'postgres' | null>(null)
 
   async function deleteAll() {
+    if (busy) return
     setBusy(true)
     setMessage(null)
     try {
