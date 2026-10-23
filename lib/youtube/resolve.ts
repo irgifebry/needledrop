@@ -390,7 +390,7 @@ async function resolveVideoSeed(
   init: SearchInit = {},
 ): Promise<SeedResolution> {
   const tracks = canReachLiveApi(init.apiKeyOverride)
-    ? await videosByIds([videoId], meter)
+    ? await videosByIds([videoId], meter, init)
     : DEMO_TRACKS.filter((track) => track.videoId === videoId)
   const track = tracks[0]
   if (!track) {
