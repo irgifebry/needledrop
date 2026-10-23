@@ -54,8 +54,8 @@ const STAGES: Stage[] = [
 ]
 
 const PHOTO = {
-  src: '/img/kazantip-popovka-crimea-technics-turntable-vinyl-turntable.jpg',
-  alt: 'A Technics turntable with a record on the platter',
+  src: '/img/brent-faiyaz-wasteland.jpg',
+  alt: "Album cover for Brent Faiyaz's WASTELAND",
 }
 
 const INK: Record<Stage['ink'], string> = {
