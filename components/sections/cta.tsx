@@ -13,10 +13,10 @@ export function Cta() {
           </h2>
         </Reveal>
 
-        <div className="pointer-events-none absolute right-[-2vw] top-1/2 z-10 hidden w-[34vw] -translate-y-1/2 rotate-[-5deg] border-4 border-paper lg:block">
+        <div className="pointer-events-none absolute right-[-2vw] bottom-[6svh] z-10 w-[44vw] rotate-[-5deg] border-4 border-paper opacity-40 sm:w-[40vw] sm:opacity-70 lg:bottom-auto lg:top-1/2 lg:w-[34vw] lg:-translate-y-1/2 lg:opacity-100">
           <Image
-            src="/img/pioneer-pl-200-turntable-with-an-aftermarket.jpg"
-            alt="A Pioneer PL-200 turntable with a record on the platter"
+            src="/img/giveon-give-or-take.jpg"
+            alt="Album cover for GIVĒON's Give Or Take"
             width={1920}
             height={1078}
             loading="lazy"
