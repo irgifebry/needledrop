@@ -90,6 +90,7 @@ export type PlaylistSummary = {
   id: string
   title: string
   description: string
+  tags?: string[]
   itemCount: number
   privacy: PlaylistPrivacy
   thumbnail?: string
@@ -276,6 +277,7 @@ function toSummary(raw: RawPlaylist): PlaylistSummary {
     id: raw.id ?? '',
     title: raw.snippet?.title ?? 'Untitled playlist',
     description,
+    tags: raw.snippet?.tags ?? [],
     itemCount: raw.contentDetails?.itemCount ?? 0,
     privacy: toPrivacy(raw.status?.privacyStatus),
     thumbnail: pickThumbnail(raw.snippet?.thumbnails),
@@ -394,7 +396,9 @@ export async function updatePlaylist(
     throw new AppError('not_found', 'That playlist no longer exists.', 404)
   }
 
-  const snippet: Record<string, unknown> = {}
+  // playlists.update replaces the selected snippet resource. Include the
+  // existing tags when the caller edits other metadata only.
+  const snippet: Record<string, unknown> = { tags: patch.tags ?? current.tags }
 
   if (patch.title !== undefined) snippet.title = patch.title
 
