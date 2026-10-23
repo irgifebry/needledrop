@@ -19,11 +19,11 @@ export function Showcase() {
           </p>
 
           <Image
-            src="/img/groove-and-needle-in-close-embrace-from.jpg"
-            alt="A stylus resting in the groove of a spinning vinyl record"
+            src="/img/tyler-the-creator-chromakopia.jpg"
+            alt="Album cover for Tyler, The Creator's CHROMAKOPIA"
             width={1920}
             height={768}
-            className="pointer-events-none absolute right-[-4vw] top-[-4svh] z-10 w-[46vw] rotate-[-4deg] border-4 border-paper object-cover"
+            className="pointer-events-none absolute right-[-4vw] top-[-4svh] z-10 w-[34vw] rotate-[-4deg] border-4 border-paper object-cover opacity-40 sm:w-[40vw] sm:opacity-70 lg:w-[46vw] lg:opacity-100"
           />
         </div>
 
