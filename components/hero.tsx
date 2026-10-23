@@ -18,18 +18,16 @@ export function Hero() {
           alt="Album cover for Daniel Caesar's Son of Spergy"
           width={1000}
           height={1000}
-          className="pointer-events-none absolute right-[-2vw] top-[6svh] z-10 w-[26vw] rotate-[5deg] border-4 border-ink object-cover opacity-40 sm:w-[30vw] sm:opacity-70 lg:w-[24vw] lg:opacity-100"
-          loading="eager"
-          fetchPriority="high"
+          className="pointer-events-none absolute right-[-2vw] top-[6rem] z-10 w-[26vw] rotate-[5deg] border-4 border-ink object-cover opacity-40 sm:top-[6svh] sm:w-[30vw] sm:opacity-70 lg:w-[24vw] lg:opacity-100"
+          loading="eager"          fetchPriority="high"
         />
         <Image
           src="/img/frank-ocean-provider.jpg"
           alt="Album cover for Frank Ocean's Provider"
           width={1000}
           height={1000}
-          className="pointer-events-none absolute right-[2vw] top-[18svh] z-10 w-[22vw] -rotate-[4deg] border-4 border-ink object-cover opacity-40 sm:w-[22vw] sm:opacity-70 xl:w-[17vw] xl:opacity-100"
-          loading="eager"
-        />
+          className="pointer-events-none absolute right-[2vw] top-[10rem] z-10 w-[22vw] -rotate-[4deg] border-4 border-ink object-cover opacity-40 sm:top-[18svh] sm:w-[22vw] sm:opacity-70 xl:w-[17vw] xl:opacity-100"
+          loading="eager"        />
 
         <div className="relative z-20 mt-auto grid grid-cols-12 items-end gap-[var(--gap)] pt-16">
           <div className="col-span-12 pb-10 lg:col-span-4 lg:pb-0">
