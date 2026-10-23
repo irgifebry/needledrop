@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createMeter, YouTubeError } from '@/lib/youtube/client'
 import { createPlaylist } from '@/lib/youtube/playlists'
+import { updatePlaylist } from '@/lib/youtube/playlist-lifecycle'
 
 /**
  * Contract tests for the playlist *write* path (PLAN §13.4).
@@ -301,5 +302,31 @@ describe('createPlaylist', () => {
     expect(steps).toContain('inserting')
     expect(steps).toContain('verifying')
     expect(steps[steps.length - 1]).toBe('done')
+  })
+})
+
+describe('updatePlaylist', () => {
+  it('preserves existing tags when only the title is changed', async () => {
+    installFetch((url) => {
+      if (url.pathname.endsWith('/playlists') && url.searchParams.get('id')) {
+        return jsonResponse({
+          items: [{
+            id: 'PL_EXISTING',
+            snippet: { title: 'Before', description: 'Existing description', tags: ['keep-me', 'also-keep'] },
+            contentDetails: { itemCount: 2 },
+            status: { privacyStatus: 'private' },
+          }],
+        })
+      }
+      if (url.pathname.endsWith('/playlists')) {
+        return jsonResponse({ id: 'PL_EXISTING', snippet: { title: 'After' }, status: { privacyStatus: 'private' } })
+      }
+      return defaultUpstream(url)
+    })
+
+    await updatePlaylist(ACCESS_TOKEN, 'PL_EXISTING', { title: 'After' }, createMeter())
+
+    const update = recorded.find((entry) => entry.path === '/youtube/v3/playlists' && entry.method === 'PUT')
+    expect((update?.body as { snippet?: { tags?: string[] } }).snippet?.tags).toEqual(['keep-me', 'also-keep'])
   })
 })
