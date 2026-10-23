@@ -2,7 +2,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import { Generator } from '@/components/generator'
-import { ButtonLink } from '@/components/ui/button'
 
 export function Hero() {
   return (
@@ -15,20 +14,20 @@ export function Hero() {
 
         {/* Cut-out sleeves, pasted over the type like a poster. */}
         <Image
-          src="/img/queen-david-bowie-under-pressure.jpg"
-          alt="Public domain single sleeve for Queen and David Bowie’s Under Pressure"
-          width={1500}
-          height={1500}
-          className="pointer-events-none absolute right-[-2vw] top-[6svh] z-30 hidden w-[24vw] rotate-[5deg] border-4 border-ink object-cover lg:block"
+          src="/img/daniel-caesar-son-of-spergy.jpg"
+          alt="Album cover for Daniel Caesar's Son of Spergy"
+          width={1000}
+          height={1000}
+          className="pointer-events-none absolute right-[-2vw] top-[6svh] z-10 w-[26vw] rotate-[5deg] border-4 border-ink object-cover opacity-40 sm:w-[30vw] sm:opacity-70 lg:w-[24vw] lg:opacity-100"
           loading="eager"
           fetchPriority="high"
         />
         <Image
-          src="/img/frank-sinatra-that-s-life-1966-vinyl.jpg"
-          alt="Public domain cover of Frank Sinatra’s 1966 album That’s Life"
-          width={1468}
-          height={1419}
-          className="pointer-events-none absolute right-[10vw] top-[20svh] z-30 hidden w-[17vw] -rotate-[4deg] border-4 border-ink object-cover xl:block"
+          src="/img/frank-ocean-provider.jpg"
+          alt="Album cover for Frank Ocean's Provider"
+          width={1000}
+          height={1000}
+          className="pointer-events-none absolute right-[2vw] top-[18svh] z-10 w-[22vw] -rotate-[4deg] border-4 border-ink object-cover opacity-40 sm:w-[22vw] sm:opacity-70 xl:w-[17vw] xl:opacity-100"
           loading="eager"
         />
 
@@ -39,9 +38,6 @@ export function Hero() {
               endpoints that do exist, and we show you the price before you pay it.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-4">
-              <ButtonLink href="/#seed-input" size="lg">
-                Drop a track
-              </ButtonLink>
               <Link
                 href="/#how"
                 className="t-small font-semibold underline decoration-mint decoration-2 underline-offset-4 hover:text-mint"
