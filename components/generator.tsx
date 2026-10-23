@@ -38,6 +38,7 @@ import {
 import { DEFAULT_OPTIONS, type Candidate, type DiscoveryOptions, type Track } from '@/lib/youtube/types'
 import type { BudgetStatus } from '@/lib/quota-ledger'
 import { cn } from '@/lib/utils'
+import { getSaveCta, getSaveCtaAction, parseGeneratorDraft, storeGeneratorDraft } from '@/lib/generator-flow'
 
 type Stage = 'seed' | 'tune' | 'build' | 'done'
 
@@ -130,6 +131,10 @@ function GeneratorInner() {
   const [privacy, setPrivacy] = useState<'private' | 'unlisted' | 'public'>('private')
 
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  const [authConfigured, setAuthConfigured] = useState(false)
+  const [liveApi, setLiveApi] = useState(false)
+  const [authNotice, setAuthNotice] = useState<string | null>(null)
+  const [draftRestored, setDraftRestored] = useState(false)
 
   const [plan, setPlan] = useState<PlanResponse | null>(null)
   const [planBusy, setPlanBusy] = useState(false)
@@ -188,8 +193,12 @@ function GeneratorInner() {
     let cancelled = false
     fetch('/api/auth/session')
       .then((response) => response.json())
-      .then((data: { signedIn: boolean }) => {
-        if (!cancelled) setSignedIn(Boolean(data.signedIn))
+      .then((data: { signedIn: boolean; configured?: boolean; liveApi?: boolean }) => {
+        if (!cancelled) {
+          setSignedIn(Boolean(data.signedIn))
+          setAuthConfigured(Boolean(data.configured))
+          setLiveApi(Boolean(data.liveApi))
+        }
       })
       .catch(() => {
         if (!cancelled) setSignedIn(false)
@@ -198,6 +207,43 @@ function GeneratorInner() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    const callback = searchParams.get('auth')
+    if (callback !== 'ok' && callback !== 'failed') return
+    let raw: string | null = null
+    try {
+      raw = window.sessionStorage.getItem('playlist-generator-draft')
+    } catch {
+      // Storage can be unavailable in restricted browser contexts.
+    }
+    const draft = raw ? parseGeneratorDraft(raw) : null
+    // Defer restoration out of the effect's synchronous phase. In particular,
+    // do not mark the draft ready for persistence until all snapshot fields
+    // have been applied, or the storage effect could overwrite the OAuth draft.
+    const restore = window.setTimeout(() => {
+      setAuthNotice(callback === 'ok' ? 'Google sign-in successful. Your draft is ready to save.' : 'Google sign-in failed. Your playlist draft has been kept; try signing in again.')
+      if (draft) {
+        setTitle(draft.title)
+        setDescription(draft.description)
+        setPrivacy(draft.privacy)
+        if (draft.seed && typeof draft.seed === 'object') setSeed(draft.seed as Track)
+        if (Array.isArray(draft.candidates)) setCandidates(draft.candidates as Candidate[])
+        if (Array.isArray(draft.picked)) setPicked(new Set(draft.picked))
+        if (draft.options && typeof draft.options === 'object') setOptions(draft.options as DiscoveryOptions)
+        if (draft.seed && Array.isArray(draft.candidates)) setStage('build')
+      }
+      setDraftRestored(true)
+    }, 0)
+    return () => window.clearTimeout(restore)
+  }, [searchParams])
+
+  useEffect(() => {
+    if (!draftRestored || stage === 'done') return
+    storeGeneratorDraft(window.sessionStorage, {
+      title, description, privacy, seed: seed ?? undefined, candidates, picked: [...picked], options,
+    })
+  }, [draftRestored, stage, title, description, privacy, seed, candidates, picked, options])
 
   // Library index for "skip tracks I already have".
   useEffect(() => {
@@ -307,8 +353,11 @@ function GeneratorInner() {
   }, [handleJobCompletion])
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  const discoverInFlightRef = useRef(false)
+
   const runDiscover = useCallback(async () => {
-    if (!seed) return
+    if (!seed || discoverInFlightRef.current) return
+    discoverInFlightRef.current = true
     setBusy('discover')
     setError(null)
     try {
@@ -334,12 +383,16 @@ function GeneratorInner() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Discovery failed.')
     } finally {
+      discoverInFlightRef.current = false
       setBusy(null)
     }
   }, [options, seed])
 
+  const planInFlightRef = useRef(false)
+
   const runPlan = useCallback(async () => {
-    if (!seed) return
+    if (!seed || planInFlightRef.current) return
+    planInFlightRef.current = true
     setPlanBusy(true)
     setError(null)
     try {
@@ -355,6 +408,7 @@ function GeneratorInner() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The plan could not be computed.')
     } finally {
+      planInFlightRef.current = false
       setPlanBusy(false)
     }
   }, [options, seed])
@@ -457,6 +511,11 @@ function GeneratorInner() {
    * privacy they tuned — goes back to defaults.
    */
   function reset() {
+    try {
+      window.sessionStorage.removeItem('playlist-generator-draft')
+    } catch {
+      // Reset the in-memory run even when storage is unavailable.
+    }
     setStage('seed')
     setSeed(null)
     setCandidates([])
@@ -570,6 +629,9 @@ function GeneratorInner() {
           : job.isRunning
             ? 'Job running…'
             : `${chosen.length} tracks selected`
+
+  const saveCta = getSaveCta({ signedIn, configured: authConfigured, liveApi, demo: demoMode })
+  const saveCtaAction = getSaveCtaAction(saveCta)
 
   return (
     <div
@@ -829,7 +891,7 @@ function GeneratorInner() {
               </p>
             )}
 
-            {error && <p className="t-small text-orange">{error}</p>}
+            {error && <p role="alert" className="t-small text-orange">{error}</p>}
 
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button onClick={() => void runDiscover()} disabled={busy === 'discover'} block>
@@ -1141,28 +1203,51 @@ function GeneratorInner() {
               </div>
 
               <p className="t-small text-paper/65">
-                Browse, search, and build your playlist without signing in. Google sign-in is only
-                needed to save to YouTube Music.
+                Browse, search, and build your playlist without signing in. {saveCtaAction === 'demo'
+                  ? 'Demo mode cannot save to YouTube Music; export your selected tracks instead.'
+                  : 'Google sign-in is only needed to save to YouTube Music.'}
               </p>
 
-              {error && <p className="t-small text-orange">{error}</p>}
+            {authNotice && <p role="status" aria-live="polite" className="t-small text-mint">{authNotice}</p>}
+            {error && <p role="alert" className="t-small text-orange">{error}</p>}
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
                   onClick={() => {
-                    if (!demoMode && signedIn !== true) {
+                    if (saveCtaAction === 'sign-in') {
+                      storeGeneratorDraft(window.sessionStorage, {
+                        title, description, privacy, seed: seed ?? undefined, candidates, picked: [...picked], options,
+                      })
                       // OAuth must complete a full browser round-trip; don't use client routing.
                       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                       window.location.href = '/api/auth/google'
                       return
                     }
+                    if (saveCtaAction === 'demo') {
+                      const chosenCandidates = candidates.filter((candidate) => picked.has(candidate.videoId))
+                      if (chosenCandidates.length === 0) {
+                        setError('Pick at least one track before creating the playlist.')
+                        return
+                      }
+                      setError(null)
+                      setCreated({
+                        playlistId: null,
+                        playlistUrl: null,
+                        demo: true,
+                        message: 'Demo mode: no playlist was created or saved to YouTube. Export your selected tracks below.',
+                      })
+                      setStage('done')
+                      return
+                    }
+                    if (saveCtaAction !== 'create') return
+                    if (privacy === 'public' && !window.confirm('This playlist will be public and visible to anyone. Create it?')) return
                     void runCreate()
                   }}
-                  disabled={busy === 'create' || job.isRunning}
+                  disabled={busy === 'create' || job.isRunning || saveCtaAction === 'none'}
                   block
                 >
                   {busy === 'create' || job.isRunning ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-                  Save to YouTube Music
+                  {saveCta === 'loading' ? 'Checking sign-in…' : saveCta === 'sign-in' ? 'Sign in to save' : saveCta === 'unavailable' ? 'YouTube save unavailable' : saveCta === 'demo' ? 'Preview demo · export only' : 'Save to YouTube Music'}
                 </Button>
                 <Button
                   variant="outline"
